@@ -6,6 +6,7 @@ import { ConfidenceIndicator } from './ConfidenceIndicator';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { RecordingStatusBar } from './RecordingStatusBar';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useI18n } from '@/i18n';
 
 interface TranscriptViewProps {
   transcripts: Transcript[];
@@ -105,6 +106,7 @@ function cleanStopWords(text: string): string {
 }
 
 export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isRecording = false, isPaused = false, isProcessing = false, isStopping = false, enableStreaming = false }) => {
+  const { t } = useI18n();
   const [speechDetected, setSpeechDetected] = useState(false);
 
   // Debug: Log the props to understand what's happening
@@ -365,13 +367,13 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
               <p className="text-xs mt-1 text-gray-400">
                 {isPaused
                   ? 'Click resume to continue recording'
-                  : 'Speak to see live transcription'}
+                  : t('common.speakToSeeTranscription')}
               </p>
             </>
           ) : (
             <>
-              <p className="text-lg font-semibold">Welcome to meetily!</p>
-              <p className="text-xs mt-1">Start recording to see live transcription</p>
+              <p className="text-lg font-semibold">{t('common.welcomeMessage')}</p>
+              <p className="text-xs mt-1">{t('common.startRecordingInstruction')}</p>
             </>
           )}
         </motion.div>

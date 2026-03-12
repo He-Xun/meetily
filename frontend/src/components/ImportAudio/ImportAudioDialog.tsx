@@ -37,6 +37,7 @@ import { useRouter } from 'next/navigation';
 import { useSidebar } from '../Sidebar/SidebarProvider';
 import { LANGUAGES } from '@/constants/languages';
 import { useTranscriptionModels, ModelOption } from '@/hooks/useTranscriptionModels';
+import { useI18n } from '@/i18n';
 
 
 interface ImportAudioDialogProps {
@@ -70,6 +71,7 @@ export function ImportAudioDialog({
   preselectedFile,
   onComplete,
 }: ImportAudioDialogProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const { refetchMeetings } = useSidebar();
   const { selectedLanguage, transcriptModelConfig } = useConfig();
@@ -224,6 +226,66 @@ export function ImportAudioDialog({
     }
   };
 
+  // Translate progress messages from backend
+  const getTranslatedProgressMessage = (progress: any): string => {
+    if (!progress) return '';
+    
+    const { stage, message, progress_percentage } = progress;
+    
+    // Check for VAD/speech detection stage
+    if (stage === 'vad' || message?.includes('Detecting speech segments')) {
+      // Extract numbers from message like "Detecting speech segments... 95% (2 found)"
+      const percentMatch = message?.match(/(\d+)%/);
+      const countMatch = message?.match(/\((\d+)\s+found\)/);
+      const percent = percentMatch ? parseInt(percentMatch[1]) : progress_percentage;
+      const count = countMatch ? parseInt(countMatch[1]) : 0;
+      return t('importProgress.detectingSpeechSegments', { progress: percent, count });
+    }
+    
+    // Translate based on stage
+    switch (stage) {
+      case 'copying':
+        return t('importProgress.copying');
+      case 'decoding':
+        return t('importProgress.decoding');
+      case 'resampling':
+        return t('importProgress.resampling');
+      case 'transcribing':
+        return t('importProgress.transcribing');
+      case 'saving':
+        return t('importProgress.saving');
+      case 'complete':
+        return t('importProgress.complete');
+      default:
+        // Try to translate by message content
+        if (message?.includes('Creating meeting folder')) {
+          return t('importProgress.creatingMeetingFolder');
+        }
+        if (message?.includes('Copying audio file')) {
+          return t('importProgress.copying');
+        }
+        if (message?.includes('Decoding audio file')) {
+          return t('importProgress.decoding');
+        }
+        if (message?.includes('Converting audio format') || message?.includes('Converting to 16kHz')) {
+          return t('importProgress.convertingAudioFormat');
+        }
+        if (message?.includes('Loading transcription engine')) {
+          return t('importProgress.loadingTranscriptionEngine');
+        }
+        if (message?.includes('Transcribing segment')) {
+          return message; // Keep the segment number as is from backend
+        }
+        if (message?.includes('Writing transcript') || message?.includes('Creating meeting')) {
+          return t('importProgress.writingTranscriptFiles');
+        }
+        if (message?.includes('Import complete')) {
+          return t('importProgress.complete');
+        }
+        return message || '';
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
@@ -236,32 +298,32 @@ export function ImportAudioDialog({
             {isProcessing ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                Importing Audio...
+                {t('import.importing')}
               </>
             ) : error ? (
               <>
                 <AlertCircle className="h-5 w-5 text-red-600" />
-                Import Failed
+                {t('import.importFailed')}
               </>
             ) : status === 'complete' ? (
               <>
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                Import Complete
+                {t('import.importComplete')}
               </>
             ) : (
               <>
                 <Upload className="h-5 w-5 text-blue-600" />
-                Import Audio File
+                {t('import.importAudio')}
               </>
             )}
           </DialogTitle>
-          <DialogDescription>
-            {isProcessing
-              ? progress?.message || 'Processing audio...'
-              : error
-              ? 'An error occurred during import'
-              : 'Import an audio file to create a new meeting with transcripts'}
-          </DialogDescription>
+        <DialogDescription>
+          {isProcessing
+            ? getTranslatedProgressMessage(progress) || t('import.processing')
+            : error
+            ? t('import.importError')
+            : t('import.importAudioDescription')}
+        </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -290,19 +352,19 @@ export function ImportAudioDialog({
 
                   {/* Editable title */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Meeting Title</label>
+                    <label className="text-sm font-medium text-gray-700">{t('meetingDetails.meetingTitle')}</label>
                     <Input
                       value={title}
                       onChange={(e) => {
                         setTitle(e.target.value);
                         setTitleModifiedByUser(true);
                       }}
-                      placeholder="Enter meeting title"
+                      placeholder={t('import.enterMeetingTitle')}
                     />
                   </div>
 
                   <Button variant="outline" size="sm" onClick={handleSelectFile} className="w-full">
-                    Choose Different File
+                    {t('import.chooseDifferentFile')}
                   </Button>
                 </div>
               ) : (
@@ -312,16 +374,16 @@ export function ImportAudioDialog({
                     {status === 'validating' ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Validating...
+                        {t('import.validating')}
                       </>
                     ) : (
                       <>
                         <Upload className="h-4 w-4 mr-2" />
-                        Select Audio File
+                        {t('import.selectAudioFile')}
                       </>
                     )}
                   </Button>
-                  <p className="text-sm text-gray-500 mt-2">MP4, WAV, MP3, FLAC, OGG, MKV, WebM, WMA</p>
+                  <p className="text-sm text-gray-500 mt-2">{t('import.supportedFormatsList', { formats: 'MP4, WAV, MP3, FLAC, OGG, MKV, WebM, WMA' })}</p>
                 </div>
               )}
 
@@ -332,7 +394,7 @@ export function ImportAudioDialog({
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     className="w-full flex items-center justify-between p-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    <span>Advanced Options</span>
+                    <span>{t('import.advancedOptions')}</span>
                     {showAdvanced ? (
                       <ChevronUp className="h-4 w-4" />
                     ) : (
@@ -347,11 +409,11 @@ export function ImportAudioDialog({
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Globe className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Language</span>
+                            <span className="text-sm font-medium">{t('common.language')}</span>
                           </div>
                           <Select value={selectedLang} onValueChange={setSelectedLang}>
                             <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select language" />
+                              <SelectValue placeholder={t('import.selectLanguage')} />
                             </SelectTrigger>
                             <SelectContent className="max-h-60">
                               {LANGUAGES.map((lang) => (
@@ -366,10 +428,10 @@ export function ImportAudioDialog({
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Globe className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Language</span>
+                            <span className="text-sm font-medium">{t('common.language')}</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Language selection isn't supported for Parakeet. It always uses automatic detection.
+                            {t('import.parakeetLanguageNotSupported')}
                           </p>
                         </div>
                       )}
@@ -379,7 +441,7 @@ export function ImportAudioDialog({
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Cpu className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Model</span>
+                            <span className="text-sm font-medium">{t('import.model')}</span>
                           </div>
                           <Select
                             value={selectedModelKey}
@@ -387,7 +449,7 @@ export function ImportAudioDialog({
                             disabled={loadingModels}
                           >
                             <SelectTrigger className="w-full">
-                              <SelectValue placeholder={loadingModels ? 'Loading models...' : 'Select model'} />
+                              <SelectValue placeholder={loadingModels ? t('import.loadingModels') : t('import.selectModel')} />
                             </SelectTrigger>
                             <SelectContent>
                               {availableModels.map((model) => (
@@ -420,11 +482,11 @@ export function ImportAudioDialog({
                   />
                 </div>
                 <div className="flex justify-between text-xs text-gray-600 mt-1">
-                  <span>{progress.stage}</span>
+                  <span>{t(`importProgress.${progress.stage}`) || progress.stage}</span>
                   <span>{Math.round(progress.progress_percentage)}%</span>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground text-center">{progress.message}</p>
+              <p className="text-sm text-muted-foreground text-center">{getTranslatedProgressMessage(progress)}</p>
             </div>
           )}
 
@@ -440,7 +502,7 @@ export function ImportAudioDialog({
           {!isProcessing && !error && (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t('importAudioDialog.cancel')}
               </Button>
               <Button
                 onClick={handleStartImport}
@@ -448,23 +510,23 @@ export function ImportAudioDialog({
                 disabled={!fileInfo}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Import
+                {t('importAudioDialog.import')}
               </Button>
             </>
           )}
           {isProcessing && (
             <Button variant="outline" onClick={handleCancel}>
               <X className="h-4 w-4 mr-2" />
-              Cancel
+              {t('importAudioDialog.cancel')}
             </Button>
           )}
           {error && (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Close
+                {t('common.close')}
               </Button>
               <Button onClick={reset} variant="outline">
-                Try Again
+                {t('common.retry')}
               </Button>
             </>
           )}

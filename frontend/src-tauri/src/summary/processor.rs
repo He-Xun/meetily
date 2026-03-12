@@ -145,6 +145,7 @@ pub fn extract_meeting_name_from_markdown(markdown: &str) -> Option<String> {
 /// * `text` - Full transcript text to summarize
 /// * `custom_prompt` - Optional user-provided context
 /// * `template_id` - Template identifier (e.g., "daily_standup", "standard_meeting")
+/// * `summary_language` - Language for the summary (e.g., "en", "zh", "fr", "ru", "es", "ar")
 /// * `token_threshold` - Token limit for single-pass processing (default 4000)
 /// * `ollama_endpoint` - Optional custom Ollama endpoint
 /// * `custom_openai_endpoint` - Optional custom OpenAI-compatible endpoint
@@ -164,6 +165,7 @@ pub async fn generate_meeting_summary(
     text: &str,
     custom_prompt: &str,
     template_id: &str,
+    summary_language: &str,
     token_threshold: usize,
     ollama_endpoint: Option<&str>,
     custom_openai_endpoint: Option<&str>,
@@ -313,6 +315,16 @@ pub async fn generate_meeting_summary(
     let clean_template_markdown = template.to_markdown_structure();
     let section_instructions = template.to_section_instructions();
 
+    // Build language instruction based on summary_language
+    let language_instruction = match summary_language {
+        "zh" => "IMPORTANT: Write the entire summary in Chinese (中文). All headings, content, and descriptions must be in Chinese.",
+        "fr" => "IMPORTANT: Write the entire summary in French (Français). All headings, content, and descriptions must be in French.",
+        "ru" => "IMPORTANT: Write the entire summary in Russian (Русский). All headings, content, and descriptions must be in Russian.",
+        "es" => "IMPORTANT: Write the entire summary in Spanish (Español). All headings, content, and descriptions must be in Spanish.",
+        "ar" => "IMPORTANT: Write the entire summary in Arabic (العربية). All headings, content, and descriptions must be in Arabic.",
+        _ => "Write the summary in English.", // Default to English
+    };
+
     let final_system_prompt = format!(
         r#"You are an expert meeting summarizer. Generate a final meeting report by filling in the provided Markdown template based on the source text.
 
@@ -323,6 +335,7 @@ pub async fn generate_meeting_summary(
 4. If a section has no relevant info, write "None noted in this section."
 5. Output **only** the completed Markdown report.
 6. If unsure about something, omit it.
+7. {}
 
 **SECTION-SPECIFIC INSTRUCTIONS:**
 {}
@@ -331,7 +344,7 @@ pub async fn generate_meeting_summary(
 {}
 </template>
 "#,
-        section_instructions, clean_template_markdown
+        language_instruction, section_instructions, clean_template_markdown
     );
 
     let mut final_user_prompt = format!(

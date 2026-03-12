@@ -76,6 +76,10 @@ interface ConfigContextType {
   isAutoSummary: boolean;
   toggleIsAutoSummary: (checked: boolean) => void;
 
+  // Summary language preference (for meeting notes generation)
+  summaryLanguage: string;
+  setSummaryLanguage: (lang: string) => void;
+
   // Provider-specific API keys
   providerApiKeys: {
     claude: string | null;
@@ -162,6 +166,23 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
     return false;
   });
+
+  // Summary language preference (for meeting notes generation)
+  // Supports: en, zh, fr, ru, es, ar (UN official languages)
+  const [summaryLanguage, setSummaryLanguageState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('summaryLanguage');
+      return saved || 'en';
+    }
+    return 'en';
+  });
+
+  const setSummaryLanguage = useCallback((lang: string) => {
+    setSummaryLanguageState(lang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('summaryLanguage', lang);
+    }
+  }, []);
 
   // Beta features state (localStorage)
   const [betaFeatures, setBetaFeatures] = useState<BetaFeatures>(() => {
@@ -487,6 +508,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setModelConfig,
     isAutoSummary,
     toggleIsAutoSummary,
+    summaryLanguage,
+    setSummaryLanguage,
     providerApiKeys,
     updateProviderApiKey,
     transcriptModelConfig,
@@ -511,6 +534,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     modelConfig,
     isAutoSummary,
     toggleIsAutoSummary,
+    summaryLanguage,
+    setSummaryLanguage,
     providerApiKeys,
     updateProviderApiKey,
     transcriptModelConfig,

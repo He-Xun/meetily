@@ -64,8 +64,8 @@ export default function PageContent({
   // Sidebar context
   const { serverAddress } = useSidebar();
 
-  // Get model config from ConfigContext
-  const { modelConfig, setModelConfig } = useConfig();
+  // Get model config and summary language from ConfigContext
+  const { modelConfig, setModelConfig, summaryLanguage } = useConfig();
 
   // Custom hooks
   const meetingData = useMeetingData({ meeting, summaryData, onMeetingUpdated });
@@ -116,6 +116,7 @@ export default function PageContent({
     modelConfig: modelConfig,
     isModelConfigLoading: false, // ConfigContext loads on mount
     selectedTemplate: templates.selectedTemplate,
+    summaryLanguage: summaryLanguage, // Pass summary language from ConfigContext
     onMeetingUpdated,
     updateMeetingTitle: meetingData.updateMeetingTitle,
     setAiSummary: meetingData.setAiSummary,

@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: false, // Disabled for BlockNote compatibility
   output: 'export',
+  distDir: 'dist',
   images: {
     unoptimized: true,
   },

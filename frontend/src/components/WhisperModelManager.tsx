@@ -14,6 +14,7 @@ import {
   WhisperAPI
 } from '../lib/whisper';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useI18n } from '@/i18n';
 
 interface ModelManagerProps {
   selectedModel?: string;
@@ -28,6 +29,7 @@ export function ModelManager({
   className = '',
   autoSave = false
 }: ModelManagerProps) {
+  const { t } = useI18n();
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -447,7 +449,7 @@ export function ModelManager({
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="advanced-models">
             <AccordionTrigger>
-              <span className='text-lg'>Advanced Models</span>
+              <span className='text-lg'>{t('whisperModels.advancedModels')}</span>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-3 pt-4">
@@ -482,7 +484,7 @@ export function ModelManager({
           animate={{ opacity: 1, y: 0 }}
           className="text-xs text-gray-500 text-center pt-2"
         >
-          Using {getDisplayName(selectedModel)} for transcription
+          {t('whisperModels.usingModel', { model: getDisplayName(selectedModel) })}
         </motion.div>
       )}
     </div>
@@ -513,6 +515,7 @@ function ModelCard({
   isDownloading,
   displayName
 }: ModelCardProps) {
+  const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
 
   const isAvailable = model.status === 'Available';
@@ -548,7 +551,7 @@ function ModelCard({
       {/* Recommended Badge */}
       {isRecommended && (
         <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-          Recommended
+          {t('whisperModels.recommended')}
         </div>
       )}
 
@@ -599,13 +602,13 @@ function ModelCard({
             </div>
           </div>
 
-          {/* Status/Action */}
+            {/* Status/Action */}
           <div className="ml-4 flex items-center gap-2">
             {isAvailable && (
               <>
                 <div className="flex items-center gap-1.5 text-green-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs font-medium">Ready</span>
+                  <span className="text-xs font-medium">{t('whisperModels.ready')}</span>
                 </div>
                 <AnimatePresence>
                   {isHovered && (
@@ -638,7 +641,7 @@ function ModelCard({
                 }}
                 className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
               >
-                Download
+                {t('whisperModels.download')}
               </button>
             )}
 
@@ -650,7 +653,7 @@ function ModelCard({
                 }}
                 className="bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
               >
-                Retry
+                {t('whisperModels.retry')}
               </button>
             )}
 
@@ -663,7 +666,7 @@ function ModelCard({
                   }}
                   className="bg-orange-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
                 >
-                  Delete
+                  {t('whisperModels.delete')}
                 </button>
                 <button
                   onClick={(e) => {
@@ -672,7 +675,7 @@ function ModelCard({
                   }}
                   className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                  Re-download
+                  {t('whisperModels.redownload')}
                 </button>
               </div>
             )}
@@ -689,7 +692,7 @@ function ModelCard({
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-blue-600">Downloading...</span>
+                <span className="text-sm font-medium text-blue-600">{t('whisperModels.downloading')}</span>
                 <span className="text-sm font-semibold text-blue-600">{Math.round(downloadProgress)}%</span>
               </div>
               <button
@@ -698,9 +701,9 @@ function ModelCard({
                   onCancel();
                 }}
                 className="text-xs text-gray-600 hover:text-red-600 font-medium transition-colors px-2 py-1 rounded hover:bg-red-50"
-                title="Cancel download"
+                title={t('whisperModels.cancelDownload')}
               >
-                Cancel
+                {t('whisperModels.cancel')}
               </button>
             </div>
             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">

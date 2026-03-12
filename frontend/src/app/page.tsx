@@ -21,6 +21,7 @@ import { TranscriptRecovery } from '@/components/TranscriptRecovery';
 import { indexedDBService } from '@/services/indexedDBService';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/i18n';
 
 export default function Home() {
   // Local page state (not moved to contexts)

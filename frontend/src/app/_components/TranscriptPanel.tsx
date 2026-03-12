@@ -10,6 +10,7 @@ import { usePermissionCheck } from '@/hooks/usePermissionCheck';
 import { ModalType } from '@/hooks/useModalState';
 import { useIsLinux } from '@/hooks/usePlatform';
 import { useMemo } from 'react';
+import { useI18n } from '@/i18n';
 
 /**
  * TranscriptPanel Component
@@ -49,6 +50,8 @@ export function TranscriptPanel({
     [transcripts]
   );
 
+  const { t } = useI18n();
+
   return (
     <div ref={transcriptContainerRef} className="w-full border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
       {/* Title area - Sticky header */}
@@ -62,11 +65,11 @@ export function TranscriptPanel({
                     variant="outline"
                     size="sm"
                     onClick={copyTranscript}
-                    title="Copy Transcript"
+                    title={t('recording.copyTranscript')}
                   >
                     <Copy />
                     <span className='hidden md:inline'>
-                      Copy
+                      {t('common.copy')}
                     </span>
                   </Button>
                 )}
@@ -75,11 +78,11 @@ export function TranscriptPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => showModal('languageSettings')}
-                    title="Language"
+                    title={t('common.language')}
                   >
                     <GlobeIcon />
                     <span className='hidden md:inline'>
-                      Language
+                      {t('common.language')}
                     </span>
                   </Button>
                 }

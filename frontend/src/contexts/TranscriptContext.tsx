@@ -7,6 +7,7 @@ import { useRecordingState } from './RecordingStateContext';
 import { transcriptService } from '@/services/transcriptService';
 import { recordingService } from '@/services/recordingService';
 import { indexedDBService } from '@/services/indexedDBService';
+import { useI18n } from '@/i18n';
 
 interface TranscriptContextType {
   transcripts: Transcript[];
@@ -31,6 +32,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
 
   // Recording state context - provides backend-synced state
   const recordingState = useRecordingState();
+  const { t } = useI18n();
 
   // Refs for transcript management
   const transcriptsRef = useRef<Transcript[]>(transcripts);
@@ -469,8 +471,8 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       .join('\n');
     navigator.clipboard.writeText(fullTranscript);
 
-    toast.success("Transcript copied to clipboard");
-  }, [transcripts]);
+    toast.success(t('recording.transcriptCopied'));
+  }, [transcripts, t]);
 
   // Force flush buffer (for final transcript processing)
   const flushBuffer = useCallback(() => {

@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/command';
 import { cn, isOllamaNotInstalledError } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
 
 export interface ModelConfig {
   provider: 'ollama' | 'groq' | 'claude' | 'openai' | 'openrouter' | 'builtin-ai' | 'custom-openai';
@@ -114,6 +115,7 @@ export function ModelSettingsModal({
   onSave,
   skipInitialFetch = false,
 }: ModelSettingsModalProps) {
+  const { t } = useI18n();
   // Use ConfigContext if available, fallback to props for backward compatibility
   const configContext = useConfig();
   const modelConfig = configContext?.modelConfig || propsModelConfig;
@@ -802,12 +804,12 @@ export function ModelSettingsModal({
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Model Settings</h3>
+        <h3 className="text-lg font-semibold">{t('settings.modelSettings')}</h3>
       </div>
 
       <div className="space-y-4">
         <div>
-          <Label>Summarization Model</Label>
+          <Label>{t('settings.summarizationModel')}</Label>
           <div className="flex space-x-2 mt-1">
             <Select
               value={modelConfig.provider}
@@ -869,12 +871,12 @@ export function ModelSettingsModal({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select provider" />
+                <SelectValue placeholder={t('settings.selectProvider')} />
               </SelectTrigger>
               <SelectContent className="max-h-64 overflow-y-auto">
-                <SelectItem value="builtin-ai">Built-in AI (Offline, No API needed)</SelectItem>
+                <SelectItem value="builtin-ai">{t('settings.builtinAi') || 'Built-in AI (Offline, No API needed)'}</SelectItem>
                 <SelectItem value="claude">Claude</SelectItem>
-                <SelectItem value="custom-openai">Custom Server (OpenAI)</SelectItem>
+                <SelectItem value="custom-openai">{t('settings.customServerOpenAI')}</SelectItem>
                 <SelectItem value="groq">Groq</SelectItem>
                 <SelectItem value="ollama">Ollama</SelectItem>
                 <SelectItem value="openai">OpenAI</SelectItem>
@@ -892,7 +894,7 @@ export function ModelSettingsModal({
                     className="flex-1 max-w-[200px] justify-between font-normal"
                   >
                     <span className="truncate">
-                      {modelConfig.model || "Select model..."}
+                      {modelConfig.model || t('settings.selectModel')}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -946,7 +948,7 @@ export function ModelSettingsModal({
         {modelConfig.provider === 'custom-openai' && (
           <div className="space-y-4 border-t pt-4">
             <div>
-              <Label htmlFor="custom-endpoint">Endpoint URL *</Label>
+              <Label htmlFor="custom-endpoint">{t('settings.endpointUrl')} *</Label>
               <Input
                 id="custom-endpoint"
                 value={customOpenAIEndpoint}
@@ -955,12 +957,12 @@ export function ModelSettingsModal({
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Base URL of the OpenAI-compatible API
+                {t('settings.baseUrlDescription')}
               </p>
             </div>
 
             <div>
-              <Label htmlFor="custom-model">Model Name *</Label>
+              <Label htmlFor="custom-model">{t('settings.modelName')} *</Label>
               <Input
                 id="custom-model"
                 value={customOpenAIModel}
@@ -969,18 +971,18 @@ export function ModelSettingsModal({
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Model identifier to use for requests
+                {t('settings.modelIdentifierDescription')}
               </p>
             </div>
 
             <div>
-              <Label htmlFor="custom-api-key">API Key (optional)</Label>
+              <Label htmlFor="custom-api-key">{t('settings.apiKeyOptional')}</Label>
               <Input
                 id="custom-api-key"
                 type="password"
                 value={customOpenAIApiKey}
                 onChange={(e) => setCustomOpenAIApiKey(e.target.value)}
-                placeholder="Leave empty if not required"
+                placeholder={t('settings.apiKeyOptional')}
                 className="mt-1"
               />
             </div>
@@ -991,7 +993,7 @@ export function ModelSettingsModal({
                 className="flex items-center justify-between cursor-pointer py-2"
                 onClick={() => setIsCustomOpenAIAdvancedOpen(!isCustomOpenAIAdvancedOpen)}
               >
-                <Label className="cursor-pointer">Advanced Options</Label>
+                <Label className="cursor-pointer">{t('settings.advancedOptions')}</Label>
                 {isCustomOpenAIAdvancedOpen ? (
                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
@@ -1002,18 +1004,18 @@ export function ModelSettingsModal({
               {isCustomOpenAIAdvancedOpen && (
                 <div className="space-y-3 pl-2 border-l-2 border-muted mt-2">
                   <div>
-                    <Label htmlFor="custom-max-tokens">Max Tokens</Label>
+                    <Label htmlFor="custom-max-tokens">{t('settings.maxTokens')}</Label>
                     <Input
                       id="custom-max-tokens"
                       type="number"
                       value={customMaxTokens}
                       onChange={(e) => setCustomMaxTokens(e.target.value)}
-                      placeholder="e.g., 4096"
+                      placeholder={t('settings.maxTokensPlaceholder')}
                       className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="custom-temperature">Temperature (0.0-2.0)</Label>
+                    <Label htmlFor="custom-temperature">{t('settings.temperature')}</Label>
                     <Input
                       id="custom-temperature"
                       type="number"
@@ -1022,12 +1024,12 @@ export function ModelSettingsModal({
                       max="2"
                       value={customTemperature}
                       onChange={(e) => setCustomTemperature(e.target.value)}
-                      placeholder="e.g., 0.7"
+                      placeholder={t('settings.temperaturePlaceholder')}
                       className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="custom-top-p">Top P (0.0-1.0)</Label>
+                    <Label htmlFor="custom-top-p">{t('settings.topP')}</Label>
                     <Input
                       id="custom-top-p"
                       type="number"
@@ -1036,7 +1038,7 @@ export function ModelSettingsModal({
                       max="1"
                       value={customTopP}
                       onChange={(e) => setCustomTopP(e.target.value)}
-                      placeholder="e.g., 0.9"
+                      placeholder={t('settings.topPPlaceholder')}
                       className="mt-1"
                     />
                   </div>
@@ -1056,12 +1058,12 @@ export function ModelSettingsModal({
               {isTestingConnection ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Testing Connection...
+                  {t('settings.testingConnection') || 'Testing Connection...'}
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Test Connection
+                  {t('settings.testConnection')}
                 </>
               )}
             </Button>
@@ -1070,14 +1072,14 @@ export function ModelSettingsModal({
 
         {requiresApiKey && (
           <div>
-            <Label>API Key</Label>
+            <Label>{t('settings.apiKeyLabel')}</Label>
             <div className="relative mt-1">
               <Input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey || ''}
                 onChange={(e) => setApiKey(e.target.value)}
                 disabled={isApiKeyLocked}
-                placeholder="Enter your API key"
+                placeholder={t('settings.enterApiKey')}
                 className="pr-24"
               />
               {isApiKeyLocked && apiKey?.trim() && (
@@ -1094,7 +1096,7 @@ export function ModelSettingsModal({
                     size="icon"
                     onClick={() => setIsApiKeyLocked(!isApiKeyLocked)}
                     className={isLockButtonVibrating ? 'animate-vibrate text-red-500' : ''}
-                    title={isApiKeyLocked ? 'Unlock to edit' : 'Lock to prevent editing'}
+                    title={isApiKeyLocked ? t('settings.unlockToEdit') : t('settings.lockToPrevent')}
                   >
                     {isApiKeyLocked ? <Lock /> : <Unlock />}
                   </Button>
@@ -1118,7 +1120,7 @@ export function ModelSettingsModal({
               className="flex items-center justify-between cursor-pointer py-2"
               onClick={() => setIsEndpointSectionCollapsed(!isEndpointSectionCollapsed)}
             >
-              <Label className="cursor-pointer">Custom Endpoint (optional)</Label>
+              <Label className="cursor-pointer">{t('settings.customEndpointOptional')}</Label>
               {isEndpointSectionCollapsed ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
@@ -1129,7 +1131,7 @@ export function ModelSettingsModal({
             {!isEndpointSectionCollapsed && (
               <>
                 <p className="text-sm text-muted-foreground mt-1 mb-2">
-                  Leave empty or enter a custom endpoint (e.g., http://x.yy.zz:11434)
+                  {t('settings.leaveEmptyOrEnter')}
                 </p>
                 <div className="flex gap-2 mt-1">
                   <div className="relative flex-1">
@@ -1168,12 +1170,12 @@ export function ModelSettingsModal({
                     {isLoadingOllama ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Fetching...
+                        {t('settings.fetching')}
                       </>
                     ) : (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Fetch Models
+                        {t('settings.fetchModels')}
                       </>
                     )}
                   </Button>
@@ -1181,7 +1183,7 @@ export function ModelSettingsModal({
                 {ollamaEndpointChanged && !error && (
                   <Alert className="mt-3 border-yellow-500 bg-yellow-50">
                     <AlertDescription className="text-yellow-800">
-                      Endpoint changed. Please click "Fetch Models" to load models from the new endpoint before saving.
+                      {t('settings.endpointChangedAlert')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1193,10 +1195,10 @@ export function ModelSettingsModal({
         {modelConfig.provider === 'ollama' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-bold">Available Ollama Models</h4>
+              <h4 className="text-sm font-bold">{t('settings.availableOllamaModels')}</h4>
               {lastFetchedEndpoint && models.length > 0 && (
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Using:</span>
+                  <span className="text-muted-foreground">{t('settings.using')}</span>
                   <code className="px-2 py-1 bg-muted rounded text-xs">
                     {lastFetchedEndpoint || 'http://localhost:11434'}
                   </code>
@@ -1206,7 +1208,7 @@ export function ModelSettingsModal({
             {models.length > 0 && (
               <div className="mb-4">
                 <Input
-                  placeholder="Search models..."
+                  placeholder={t('settings.searchModels')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full"
@@ -1216,7 +1218,7 @@ export function ModelSettingsModal({
             {isLoadingOllama ? (
               <div className="text-center py-8 text-muted-foreground">
                 <RefreshCw className="mx-auto h-8 w-8 animate-spin mb-2" />
-                Loading models...
+                {t('settings.fetching')}
               </div>
             ) : models.length === 0 ? (
               <div className="space-y-3">
@@ -1225,7 +1227,7 @@ export function ModelSettingsModal({
                   <div className="space-y-4">
                     <Alert className="border-orange-500 bg-orange-50">
                       <AlertDescription className="text-orange-800">
-                        Ollama is not installed or not running. Please download and install Ollama to use local models.
+                        {t('settings.ollamaNotInstalled')}
                       </AlertDescription>
                     </Alert>
                     <Button
@@ -1235,10 +1237,10 @@ export function ModelSettingsModal({
                       className="w-full bg-blue-600 hover:bg-blue-700"
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Download Ollama
+                      {t('settings.downloadOllama')}
                     </Button>
                     <div className="text-sm text-muted-foreground text-center">
-                      After installing Ollama, restart this application and click "Fetch Models" to continue.
+                      {t('settings.afterInstallInstructions')}
                     </div>
                   </div>
                 ) : (
@@ -1247,8 +1249,8 @@ export function ModelSettingsModal({
                     <Alert className="mb-4">
                       <AlertDescription>
                         {ollamaEndpointChanged
-                          ? 'Endpoint changed. Click "Fetch Models" to load models from the new endpoint.'
-                          : 'No models found. Download a recommended model or click "Fetch Models" to load available Ollama models.'}
+                          ? t('settings.endpointChangedAlert')
+                          : t('settings.noModelsFoundFetch')}
                       </AlertDescription>
                     </Alert>
                     {!ollamaEndpointChanged && (

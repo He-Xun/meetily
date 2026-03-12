@@ -72,6 +72,7 @@ impl SummaryService {
     /// * `model_name` - Specific model (e.g., "gpt-4", "llama3.2:latest")
     /// * `custom_prompt` - Optional user-provided context
     /// * `template_id` - Template identifier (e.g., "daily_standup", "standard_meeting")
+    /// * `summary_language` - Language for the summary (e.g., "en", "zh", "fr", "ru", "es", "ar")
     pub async fn process_transcript_background<R: tauri::Runtime>(
         _app: AppHandle<R>,
         pool: SqlitePool,
@@ -81,6 +82,7 @@ impl SummaryService {
         model_name: String,
         custom_prompt: String,
         template_id: String,
+        summary_language: String,
     ) {
         let start_time = Instant::now();
         info!(
@@ -229,6 +231,7 @@ impl SummaryService {
             &text,
             &custom_prompt,
             &template_id,
+            &summary_language,
             token_threshold,
             ollama_endpoint.as_deref(),
             custom_openai_endpoint.as_deref(),

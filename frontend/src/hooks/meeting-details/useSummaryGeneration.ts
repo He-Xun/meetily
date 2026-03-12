@@ -16,6 +16,7 @@ interface UseSummaryGenerationProps {
   modelConfig: ModelConfig;
   isModelConfigLoading: boolean;
   selectedTemplate: string;
+  summaryLanguage?: string; // Language for summary generation (en, zh, fr, ru, es, ar)
   onMeetingUpdated?: () => Promise<void>;
   updateMeetingTitle: (title: string) => void;
   setAiSummary: (summary: Summary | null) => void;
@@ -28,6 +29,7 @@ export function useSummaryGeneration({
   modelConfig,
   isModelConfigLoading,
   selectedTemplate,
+  summaryLanguage = 'en',
   onMeetingUpdated,
   updateMeetingTitle,
   setAiSummary,
@@ -113,6 +115,7 @@ export function useSummaryGeneration({
         overlap: 1000,
         customPrompt: customPrompt,
         templateId: selectedTemplate,
+        summaryLanguage: summaryLanguage,
       }) as any;
 
       const process_id = result.process_id;

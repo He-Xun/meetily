@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { RecordingStatusBar } from "./RecordingStatusBar";
 import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptSegmentData } from "@/types";
+import { useI18n } from "@/i18n";
 
 export interface VirtualizedTranscriptViewProps {
     /** Transcript segments to display */
@@ -125,6 +126,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     loadedCount = 0,
     onLoadMore,
 }) => {
+    const { t } = useI18n();
     // Create scroll ref first - shared between virtualizer and auto-scroll hook
     const scrollRef = useRef<HTMLDivElement>(null);
     // Ref for infinite scroll trigger element
@@ -249,16 +251,16 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                 <div className={`w-3 h-3 rounded-full ${isPaused ? 'bg-orange-500' : 'bg-blue-500 animate-pulse'}`}></div>
                             </div>
                             <p className="text-sm text-gray-600">
-                                {isPaused ? 'Recording paused' : 'Listening for speech...'}
+                                {isPaused ? t('recording.paused') : t('recording.listening')}
                             </p>
                             <p className="text-xs mt-1 text-gray-400">
-                                {isPaused ? 'Click resume to continue recording' : 'Speak to see live transcription'}
+                                {isPaused ? t('recording.clickResume') : t('recording.speakToSeeTranscription')}
                             </p>
                         </>
                     ) : (
                         <>
-                            <p className="text-lg font-semibold">Welcome to meetily!</p>
-                            <p className="text-xs mt-1">Start recording to see live transcription</p>
+                            <p className="text-lg font-semibold">{t('welcome.title')}</p>
+                            <p className="text-xs mt-1">{t('welcome.subtitle')}</p>
                         </>
                     )}
                 </motion.div>

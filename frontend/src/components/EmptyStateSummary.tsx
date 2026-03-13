@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useTranslations } from 'next-intl';
+import { useI18n } from '@/i18n';
 
 interface EmptyStateSummaryProps {
   onGenerate: () => void;
@@ -18,7 +18,7 @@ interface EmptyStateSummaryProps {
 }
 
 export function EmptyStateSummary({ onGenerate, hasModel, isGenerating = false }: EmptyStateSummaryProps) {
-  const t = useTranslations();
+  const { t } = useI18n();
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}

@@ -10,6 +10,7 @@ export default {
     extend: {
       fontFamily: {
         sans: [
+          'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',
           '"PingFang SC"',
@@ -19,6 +20,8 @@ export default {
           '"Helvetica Neue"',
           'Arial',
           'sans-serif',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
         ],
       },
       colors: {

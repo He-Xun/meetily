@@ -23,7 +23,14 @@ export function SummaryModelSettings({ refetchTrigger }: SummaryModelSettingsPro
     ollamaEndpoint: null
   });
 
-  const { isAutoSummary, toggleIsAutoSummary } = useConfig();
+  const config = useConfig();
+
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+
+  const { isAutoSummary, toggleIsAutoSummary } = config;
 
   // Reusable fetch function
   const fetchModelConfig = useCallback(async () => {
@@ -156,8 +163,8 @@ export function SummaryModelSettings({ refetchTrigger }: SummaryModelSettingsPro
         <p className="text-sm text-gray-600 mb-6">
           {t('settings.summaryLanguageDescription')}
         </p>
-        
-        <SummaryLanguageSelection />
+
+        <SummaryLanguageSelection showLabel={false} />
       </div>
     </div>
   );

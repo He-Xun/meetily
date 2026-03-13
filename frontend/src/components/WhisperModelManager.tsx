@@ -556,8 +556,8 @@ function ModelCard({
       )}
 
       <div className="p-3">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1 text-left">
             {/* Model Name and Tagline */}
             <div className="flex items-center gap-2 flex-wrap mb-2">
               <span className="text-2xl">{getModelIcon(model.accuracy)}</span>
@@ -603,16 +603,17 @@ function ModelCard({
           </div>
 
             {/* Status/Action */}
-          <div className="ml-4 flex items-center gap-2">
+          <div className="ml-4 flex items-center gap-2 min-w-[100px] justify-end self-center">
             {isAvailable && (
               <>
-                <div className="flex items-center gap-1.5 text-green-600">
+                <div className="flex items-center gap-1.5 text-green-600 shrink-0">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-xs font-medium">{t('whisperModels.ready')}</span>
                 </div>
-                <AnimatePresence>
+                <AnimatePresence mode="wait">
                   {isHovered && (
                     <motion.button
+                      layout
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
@@ -621,7 +622,7 @@ function ModelCard({
                         e.stopPropagation();
                         onDelete();
                       }}
-                      className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                      className="text-gray-400 hover:text-red-600 transition-colors p-1 shrink-0"
                       title="Delete model to free up space"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

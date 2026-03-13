@@ -29,8 +29,13 @@ export function SummaryLanguageSelection({
   showLabel = true,
   className = ''
 }: SummaryLanguageSelectionProps) {
-  const { summaryLanguage, setSummaryLanguage } = useConfig();
   const { t } = useI18n();
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+  const { summaryLanguage, setSummaryLanguage } = config;
 
   const handleLanguageChange = async (languageCode: string) => {
     setSummaryLanguage(languageCode);
@@ -52,13 +57,10 @@ export function SummaryLanguageSelection({
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-gray-600" />
           <label className="text-sm font-medium text-gray-900">
-            {t('summary.summaryLanguage')}
+            {t('settings.summaryLanguage')}
           </label>
         </div>
       )}
-      <p className="text-xs text-gray-500">
-        {t('summary.summaryLanguageDescription')}
-      </p>
       <select
         value={summaryLanguage}
         onChange={(e) => handleLanguageChange(e.target.value)}
@@ -80,7 +82,12 @@ export function SummaryLanguageSelectionCompact({
   disabled = false,
   className = ''
 }: SummaryLanguageSelectionProps) {
-  const { summaryLanguage, setSummaryLanguage } = useConfig();
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+  const { summaryLanguage, setSummaryLanguage } = config;
 
   const handleLanguageChange = async (languageCode: string) => {
     setSummaryLanguage(languageCode);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -371,7 +371,6 @@ export function ParakeetModelManager({
           onDownload={() => downloadModel(recommendedModel.name)}
           onCancel={() => cancelDownload(recommendedModel.name)}
           onDelete={() => deleteModel(recommendedModel.name)}
-          isDownloading={downloadingModels.has(recommendedModel.name)}
         />
       )}
 
@@ -392,7 +391,6 @@ export function ParakeetModelManager({
               onDownload={() => downloadModel(model.name)}
               onCancel={() => cancelDownload(model.name)}
               onDelete={() => deleteModel(model.name)}
-              isDownloading={downloadingModels.has(model.name)}
             />
           ))}
         </div>
@@ -421,7 +419,6 @@ interface ModelCardProps {
   onDownload: () => void;
   onCancel: () => void;
   onDelete: () => void;
-  isDownloading: boolean;
 }
 
 function ModelCard({
@@ -431,8 +428,7 @@ function ModelCard({
   onSelect,
   onDownload,
   onCancel,
-  onDelete,
-  isDownloading
+  onDelete
 }: ModelCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const displayInfo = getModelDisplayInfo(model.name);
@@ -478,12 +474,14 @@ function ModelCard({
       )}
 
       <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            {/* Model Name */}
-            <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 text-left">
+            {/* Model Name with Tagline on same line, then description below */}
+            <div className="flex items-center gap-2 flex-wrap mb-2">
               <span className="text-2xl">{icon}</span>
               <h3 className="font-semibold text-gray-900">{displayName}</h3>
+              <span className="text-sm text-gray-500">•</span>
+              <span className="text-sm text-gray-500">{tagline}</span>
               {isSelected && isAvailable && (
                 <motion.span
                   initial={{ scale: 0 }}
@@ -494,22 +492,20 @@ function ModelCard({
                 </motion.span>
               )}
             </div>
-
-            {/* Tagline */}
-            <p className="text-sm text-gray-600 ml-9">{tagline}</p>
           </div>
 
-          {/* Status/Action */}
-          <div className="ml-4 flex items-center gap-2">
+          {/* Status/Action - fixed width to prevent layout shift on hover */}
+          <div className="ml-4 flex items-center gap-2 min-w-[100px] justify-end self-center">
             {isAvailable && (
               <>
-                <div className="flex items-center gap-1.5 text-green-600">
+                <div className="flex items-center gap-1.5 text-green-600 shrink-0">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-xs font-medium">Ready</span>
                 </div>
-                <AnimatePresence>
+                <AnimatePresence mode="wait">
                   {isHovered && (
                     <motion.button
+                      layout
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
@@ -518,7 +514,7 @@ function ModelCard({
                         e.stopPropagation();
                         onDelete();
                       }}
-                      className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                      className="text-gray-400 hover:text-red-600 transition-colors p-1 shrink-0"
                       title="Delete model to free up space"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -13,6 +13,14 @@ import { BetaSettings } from '@/components/BetaSettings';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useI18n } from '@/i18n';
+import { TranscriptModelProps } from '@/components/TranscriptSettings';
+
+// Default transcript config for SSR fallback
+const DEFAULT_TRANSCRIPT_CONFIG: TranscriptModelProps = {
+  provider: 'parakeet',
+  model: 'parakeet-tdt-0.6b-v3-int8',
+  apiKey: null
+};
 
 // Tabs configuration (constant)
 const TABS = [
@@ -25,8 +33,12 @@ const TABS = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { transcriptModelConfig, setTranscriptModelConfig } = useConfig();
+  const config = useConfig();
   const { t } = useI18n();
+  
+  // Handle SSR case where config is null
+  const transcriptModelConfig = config?.transcriptModelConfig ?? DEFAULT_TRANSCRIPT_CONFIG;
+  const setTranscriptModelConfig = config?.setTranscriptModelConfig ?? (() => {});
 
   // Animation state for tabs
   const [activeTab, setActiveTab] = useState('general');

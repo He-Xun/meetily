@@ -65,7 +65,12 @@ export default function PageContent({
   const { serverAddress } = useSidebar();
 
   // Get model config and summary language from ConfigContext
-  const { modelConfig, setModelConfig, summaryLanguage } = useConfig();
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+  const { modelConfig, setModelConfig, summaryLanguage } = config;
 
   // Custom hooks
   const meetingData = useMeetingData({ meeting, summaryData, onMeetingUpdated });

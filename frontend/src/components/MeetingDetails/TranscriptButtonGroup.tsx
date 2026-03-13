@@ -28,7 +28,8 @@ export function TranscriptButtonGroup({
   meetingFolderPath,
   onRefetchTranscripts,
 }: TranscriptButtonGroupProps) {
-  const { betaFeatures } = useConfig();
+  const config = useConfig();
+  const betaFeatures = config?.betaFeatures;
   const { t } = useI18n();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
 

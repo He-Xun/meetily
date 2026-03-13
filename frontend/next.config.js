@@ -1,14 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false, // Disabled for BlockNote compatibility
-  output: 'export',
+  // Use standalone mode for Tauri (not export, to avoid generateStaticParams requirement)
   distDir: 'dist',
+  // Disable all forms of static optimization for Tauri desktop app
+  experimental: {
+    serverComponentsExternalPackages: [],
+  },
   images: {
     unoptimized: true,
   },
   // Add basePath configuration
   basePath: '',
-  assetPrefix: '/',
+  assetPrefix: '',
 
   // Add webpack configuration for Tauri
   webpack: (config, { isServer }) => {

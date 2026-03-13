@@ -74,7 +74,12 @@ export function ImportAudioDialog({
   const { t } = useI18n();
   const router = useRouter();
   const { refetchMeetings } = useSidebar();
-  const { selectedLanguage, transcriptModelConfig } = useConfig();
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+  const { selectedLanguage, transcriptModelConfig } = config;
 
   const [title, setTitle] = useState('');
   const [selectedLang, setSelectedLang] = useState(selectedLanguage || 'auto');

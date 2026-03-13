@@ -58,7 +58,9 @@ export function RetranscribeDialog({
   meetingFolderPath,
   onComplete,
 }: RetranscribeDialogProps) {
-  const { selectedLanguage, transcriptModelConfig } = useConfig();
+  const config = useConfig();
+  const selectedLanguage = config?.selectedLanguage;
+  const transcriptModelConfig = config?.transcriptModelConfig;
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<RetranscriptionProgress | null>(null);
   const [error, setError] = useState<string | null>(null);

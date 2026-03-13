@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react';
 import { Clock, Users, Calendar, Tag } from 'lucide-react';
 
@@ -14,16 +16,6 @@ interface Note {
   attendees?: string[];
   tags: string[];
   content: string;
-}
-
-export function generateStaticParams() {
-  // Return all possible note IDs
-  return [
-    { id: 'team-sync-dec-26' },
-    { id: 'product-review' },
-    { id: 'project-ideas' },
-    { id: 'action-items' }
-  ];
 }
 
 const NotePage = ({ params }: PageProps) => {

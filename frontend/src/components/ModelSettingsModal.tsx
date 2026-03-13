@@ -102,6 +102,42 @@ const GROQ_FALLBACK_MODELS = [
   'gemma2-9b-it',
 ];
 
+// Model descriptions for display in dropdown
+const MODEL_DESCRIPTIONS: Record<string, string> = {
+  // Ollama models
+  'llama3.2:latest': 'Fast and efficient for general use',
+  'llama3.2:70b': 'High quality, larger model',
+  'qwen2.5:latest': 'Strong multilingual capabilities',
+  'mistral:latest': 'Balanced performance and speed',
+  'gemma2:latest': 'Lightweight and efficient',
+
+  // Claude models
+  'claude-sonnet-4-5-20250929': 'Most capable model for complex tasks',
+  'claude-haiku-4-5-20251001': 'Fastest model, great for simple tasks',
+  'claude-opus-4-5-20251101': 'Maximum intelligence for demanding work',
+  'claude-3-5-sonnet-latest': 'Reliable workhorse model',
+
+  // GPT models
+  'gpt-4o': 'Flagship model with broad capabilities',
+  'gpt-4o-mini': 'Fast and cost-effective',
+  'gpt-4-turbo': 'High performance, faster than GPT-4',
+  'gpt-3.5-turbo': 'Fastest, good for simple tasks',
+  'o1': 'Advanced reasoning model',
+  'o1-mini': 'Faster reasoning for most tasks',
+  'o3': 'Latest reasoning breakthrough',
+  'o3-mini': 'Efficient reasoning model',
+
+  // Groq models
+  'llama-3.3-70b-versatile': 'Fast inference, high quality',
+  'llama-3.1-70b-versatile': 'Excellent balance of speed and capability',
+  'mixtral-8x7b-32768': 'Mixture of experts architecture',
+  'gemma2-9b-it': 'Compact yet powerful',
+};
+
+function getModelDescription(model: string): string | undefined {
+  return MODEL_DESCRIPTIONS[model];
+}
+
 interface ModelSettingsModalProps {
   modelConfig: ModelConfig;
   setModelConfig: (config: ModelConfig | ((prev: ModelConfig) => ModelConfig)) => void;
@@ -117,11 +153,15 @@ export function ModelSettingsModal({
 }: ModelSettingsModalProps) {
   const { t } = useI18n();
   // Use ConfigContext if available, fallback to props for backward compatibility
-  const configContext = useConfig();
-  const modelConfig = configContext?.modelConfig || propsModelConfig;
-  const setModelConfig = configContext?.setModelConfig || propsSetModelConfig;
-  const providerApiKeys = configContext?.providerApiKeys;
-  const updateProviderApiKey = configContext?.updateProviderApiKey;
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+  const modelConfig = config.modelConfig || propsModelConfig;
+  const setModelConfig = config.setModelConfig || propsSetModelConfig;
+  const providerApiKeys = config.providerApiKeys;
+  const updateProviderApiKey = config.updateProviderApiKey;
 
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [error, setError] = useState<string>('');
@@ -915,24 +955,32 @@ export function ModelSettingsModal({
                         <>
                           <CommandEmpty>No models found.</CommandEmpty>
                           <CommandGroup>
-                            {modelOptions[modelConfig.provider]?.map((model) => (
-                              <CommandItem
-                                key={model}
-                                value={model}
-                                onSelect={(currentValue) => {
-                                  setModelConfig((prev: ModelConfig) => ({ ...prev, model: currentValue }));
-                                  setModelComboboxOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    modelConfig.model === model ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <span className="truncate">{model}</span>
-                              </CommandItem>
-                            ))}
+                            {modelOptions[modelConfig.provider]?.map((model) => {
+                              const description = getModelDescription(model);
+                              return (
+                                <CommandItem
+                                  key={model}
+                                  value={model}
+                                  onSelect={(currentValue) => {
+                                    setModelConfig((prev: ModelConfig) => ({ ...prev, model: currentValue }));
+                                    setModelComboboxOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4 mt-0.5",
+                                      modelConfig.model === model ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">{model}</span>
+                                    {description && (
+                                      <span className="text-xs text-muted-foreground">{description}</span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
                           </CommandGroup>
                         </>
                       )}
@@ -1399,7 +1447,7 @@ export function ModelSettingsModal({
           onClick={handleSave}
           disabled={isDoneDisabled}
         >
-          Save
+            {t('common.save')}
         </Button>
       </div>
     </div>

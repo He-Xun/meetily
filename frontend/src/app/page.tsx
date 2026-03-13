@@ -31,8 +31,12 @@ export default function Home() {
 
   // Use contexts for state management
   const { meetingTitle } = useTranscripts();
-  const { transcriptModelConfig, selectedDevices } = useConfig();
+  const config = useConfig();
   const recordingState = useRecordingState();
+
+  // Handle SSR case where config is null
+  const transcriptModelConfig = config?.transcriptModelConfig ?? { provider: 'parakeet', model: 'parakeet-tdt-0.6b-v3-int8', apiKey: null };
+  const selectedDevices = config?.selectedDevices ?? { micDevice: null, systemDevice: null };
 
   // Extract status from global state
   const { status, isStopping, isProcessing, isSaving } = recordingState;

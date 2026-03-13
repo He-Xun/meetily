@@ -6,7 +6,7 @@ import { SelectedDevices } from '@/components/DeviceSelection';
 import { configService, ModelConfig } from '@/services/configService';
 import { invoke } from '@tauri-apps/api/core';
 import Analytics from '@/lib/analytics';
-import { BetaFeatures, BetaFeatureKey, loadBetaFeatures, saveBetaFeatures } from '@/types/betaFeatures';
+import { BetaFeatures, BetaFeatureKey, loadBetaFeatures, saveBetaFeatures, DEFAULT_BETA_FEATURES } from '@/types/betaFeatures';
 
 export interface OllamaModel {
   name: string;
@@ -565,8 +565,39 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
 export function useConfig() {
   const context = useContext(ConfigContext);
-  if (context === undefined) {
-    throw new Error('useConfig must be used within a ConfigProvider');
+
+  // During SSR or when context is undefined, return safe defaults
+  if (typeof window === 'undefined' || context === undefined) {
+    // Return a safe default config object for SSR
+    return {
+      betaFeatures: { ...DEFAULT_BETA_FEATURES },
+      toggleBetaFeature: () => {},
+      modelConfig: { provider: 'ollama', model: 'llama3.2:latest', whisperModel: 'large-v3', ollamaEndpoint: null },
+      setModelConfig: () => {},
+      transcriptModelConfig: { provider: 'parakeet', model: 'parakeet-tdt-0.6b-v3-int8', apiKey: null },
+      setTranscriptModelConfig: () => {},
+      selectedDevices: { micDevice: null, systemDevice: null },
+      setSelectedDevices: () => {},
+      selectedLanguage: 'auto',
+      setSelectedLanguage: () => {},
+      showConfidenceIndicator: true,
+      toggleConfidenceIndicator: () => {},
+      models: [],
+      modelOptions: { ollama: [], claude: [], groq: [], openrouter: [], openai: [], 'builtin-ai': [], 'custom-openai': [] },
+      error: '',
+      isAutoSummary: false,
+      toggleIsAutoSummary: () => {},
+      summaryLanguage: 'en',
+      setSummaryLanguage: () => {},
+      providerApiKeys: { claude: null, groq: null, openai: null, openrouter: null },
+      updateProviderApiKey: () => {},
+      notificationSettings: null,
+      storageLocations: null,
+      isLoadingPreferences: false,
+      loadPreferences: async () => {},
+      updateNotificationSettings: async () => {},
+    } as ConfigContextType;
   }
+
   return context;
 }

@@ -129,7 +129,8 @@ export function LanguageSelection({
   provider = 'localWhisper'
 }: LanguageSelectionProps) {
   const [saving, setSaving] = useState(false);
-  const { setSelectedLanguage } = useConfig();
+  const config = useConfig();
+  const { setSelectedLanguage } = config || {};
   const { t } = useI18n();
 
   // Parakeet only supports auto-detection (doesn't support manual language selection)

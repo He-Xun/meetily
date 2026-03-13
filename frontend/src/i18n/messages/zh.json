@@ -221,6 +221,7 @@
     "regenerateSummary": "重新生成摘要"
   },
   "summary": {
+    "summaryLanguage":"摘要语言",
     "noSummaryGenerated": "尚未生成摘要",
     "generateSummaryDescription": "生成 AI 驱动的会议摘要，获取要点、行动项目和决策。",
     "generating": "生成中...",

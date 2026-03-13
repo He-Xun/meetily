@@ -221,6 +221,7 @@
     "regenerateSummary": "Regenerate Summary"
   },
   "summary": {
+    "summaryLanguage":"Summary Language",
     "noSummaryGenerated": "No Summary Generated Yet",
     "generateSummary": "Generate Summary",
     "summaryLanguageDescription": "Select the language for meeting summaries.",

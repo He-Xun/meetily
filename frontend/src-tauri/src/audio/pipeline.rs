@@ -193,11 +193,13 @@ impl ProfessionalAudioMixer {
 #[derive(Clone)]
 pub struct AudioCapture {
     device: Arc<AudioDevice>,
+    #[allow(dead_code)]
     state: Arc<RecordingState>,
     sample_rate: u32,        // Original device sample rate
     channels: u16,
     chunk_counter: Arc<std::sync::atomic::AtomicU64>,
     device_type: DeviceType,
+    #[allow(dead_code)]
     recording_sender: Option<mpsc::UnboundedSender<AudioChunk>>,
     needs_resampling: bool,  // Flag if resampling is required
     // CRITICAL FIX: Persistent resampler to preserve energy across chunks
@@ -216,7 +218,8 @@ pub struct AudioCapture {
 impl AudioCapture {
     pub fn new(
         device: Arc<AudioDevice>,
-        state: Arc<RecordingState>,
+        #[allow(dead_code)]
+    state: Arc<RecordingState>,
         sample_rate: u32,
         channels: u16,
         device_type: DeviceType,
@@ -680,6 +683,7 @@ impl AudioCapture {
 pub struct AudioPipeline {
     receiver: mpsc::UnboundedReceiver<AudioChunk>,
     transcription_sender: mpsc::UnboundedSender<AudioChunk>,
+    #[allow(dead_code)]
     state: Arc<RecordingState>,
     vad_processor: ContinuousVadProcessor,
     sample_rate: u32,
@@ -700,7 +704,8 @@ impl AudioPipeline {
     pub fn new(
         receiver: mpsc::UnboundedReceiver<AudioChunk>,
         transcription_sender: mpsc::UnboundedSender<AudioChunk>,
-        state: Arc<RecordingState>,
+        #[allow(dead_code)]
+    state: Arc<RecordingState>,
         target_chunk_duration_ms: u32,
         sample_rate: u32,
         mic_device_name: String,
@@ -957,7 +962,8 @@ impl AudioPipelineManager {
     /// Start the audio pipeline with device information for adaptive buffering
     pub fn start(
         &mut self,
-        state: Arc<RecordingState>,
+        #[allow(dead_code)]
+    state: Arc<RecordingState>,
         transcription_sender: mpsc::UnboundedSender<AudioChunk>,
         target_chunk_duration_ms: u32,
         sample_rate: u32,

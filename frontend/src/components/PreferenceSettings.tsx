@@ -10,13 +10,18 @@ import { useConfig, NotificationSettings } from "@/contexts/ConfigContext"
 import { useI18n, locales, Locale, localeNames } from "@/i18n"
 
 export function PreferenceSettings() {
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null; // or a loading state
+  }
   const {
     notificationSettings,
     storageLocations,
     isLoadingPreferences,
     loadPreferences,
     updateNotificationSettings
-  } = useConfig();
+  } = config;
 
   // i18n hook for translation and locale management
   const { t, locale, setLocale } = useI18n();

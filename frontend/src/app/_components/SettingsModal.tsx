@@ -42,6 +42,11 @@ export function SettingsModals({
 }: SettingsModalsProps) {
   const { t } = useI18n();
   // Contexts
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
   const {
     modelConfig,
     setModelConfig,
@@ -56,7 +61,7 @@ export function SettingsModals({
     setTranscriptModelConfig,
     showConfidenceIndicator,
     toggleConfidenceIndicator,
-  } = useConfig();
+  } = config;
 
   const { isRecording } = useRecordingState();
 

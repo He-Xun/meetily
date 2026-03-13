@@ -98,8 +98,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
 export function useI18n() {
   const context = useContext(I18nContext);
+  // Return safe defaults during SSR or when context is undefined
   if (!context) {
-    throw new Error('useI18n must be used within an I18nProvider');
+    return {
+      locale: 'en' as Locale,
+      setLocale: () => {},
+      t: (key: string) => key, // Return the key as fallback
+      direction: 'ltr' as const,
+      localeNames,
+      messages: {},
+    };
   }
   return context;
 }

@@ -7,8 +7,15 @@ import { BetaFeatureKey, getBetaFeatureNames, getBetaFeatureDescriptions } from 
 import { useI18n } from "@/i18n"
 
 export function BetaSettings() {
-  const { betaFeatures, toggleBetaFeature } = useConfig();
+  const config = useConfig();
   const { t } = useI18n();
+
+  // Handle SSR case where config is null
+  if (!config) {
+    return null;
+  }
+
+  const { betaFeatures, toggleBetaFeature } = config;
 
   // Define feature order for display (allows custom ordering)
   const featureOrder: BetaFeatureKey[] = ['importAndRetranscribe'];

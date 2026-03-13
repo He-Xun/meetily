@@ -34,7 +34,12 @@ export function useRecordingStart(
 
   const { clearTranscripts, setMeetingTitle } = useTranscripts();
   const { setIsMeetingActive } = useSidebar();
-  const { selectedDevices } = useConfig();
+  const config = useConfig();
+  // Handle SSR case where config is null
+  if (!config) {
+    throw new Error('Config not available');
+  }
+  const { selectedDevices } = config;
   const { setStatus } = useRecordingState();
 
   // Generate meeting title with timestamp

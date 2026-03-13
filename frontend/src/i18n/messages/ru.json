@@ -221,6 +221,7 @@
     "regenerateSummary": "Перегенерировать резюме"
   },
   "summary": {
+    "summaryLanguage":"Язык резюме",
     "noSummaryGenerated": "Резюме еще не создано",
     "generateSummaryDescription": "Создайте резюме на основе ИИ для вашей стенограммы встречи, чтобы получить ключевые моменты, задачи и решения.",
     "generating": "Создание...",

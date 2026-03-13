@@ -221,6 +221,7 @@
     "regenerateSummary": "Regenerate Summary"
   },
   "summary": {
+    "summaryLanguage":"Langue du résumé",
     "noSummaryGenerated": "Aucun résumé généré pour le moment",
     "generateSummaryDescription": "Générez un résumé alimenté par l'IA de votre transcription de réunion pour obtenir les points clés, les éléments d'action et les décisions.",
     "generating": "Génération en cours...",

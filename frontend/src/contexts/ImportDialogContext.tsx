@@ -22,11 +22,12 @@ interface ImportDialogProviderProps {
 }
 
 export function ImportDialogProvider({ children, onOpen }: ImportDialogProviderProps) {
-  const { betaFeatures } = useConfig();
+  const config = useConfig();
 
   const openImportDialog = useCallback((filePath?: string | null) => {
     // Gate: Check beta feature flag before opening dialog
-    if (!betaFeatures.importAndRetranscribe) {
+    // Handle SSR case where config is null
+    if (!config?.betaFeatures.importAndRetranscribe) {
       toast.error('Beta feature disabled', {
         description: 'Enable "Import Audio & Retranscribe" in Settings > Beta to use this feature.'
       });
@@ -34,7 +35,7 @@ export function ImportDialogProvider({ children, onOpen }: ImportDialogProviderP
     }
 
     onOpen(filePath);
-  }, [onOpen, betaFeatures]);
+  }, [onOpen, config?.betaFeatures]);
 
   return (
     <ImportDialogContext.Provider value={{ openImportDialog }}>

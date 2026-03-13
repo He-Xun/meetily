@@ -221,6 +221,7 @@
     "regenerateSummary": "إعادة إنشاء الملخص"
   },
   "summary": {
+    "summaryLanguage":"لغة الملخص",
     "noSummaryGenerated": "لم يتم إنشاء ملخص بعد",
     "generateSummaryDescription": "قم بإنشاء ملخص مدعوم بالذكاء الاصطناعي لمحضر اجتماعك للحصول على النقاط الرئيسية وعناصر العمل والقرارات.",
     "generating": "جاري الإنشاء...",

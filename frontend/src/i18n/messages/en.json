@@ -144,6 +144,7 @@
     "betaFeature": "Beta Feature",
     "localWhisperHighAccuracy": "Local Whisper (High Accuracy)",
     "parakeetRecommended": "Parakeet (Recommended - Real-time / Accurate)",
+    "qwenMultilingual": "Qwen3-ASR (Multilingual)",
     "recording": "Recording",
     "enhance": "Enhance"
   },

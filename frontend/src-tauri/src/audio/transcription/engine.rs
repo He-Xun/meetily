@@ -135,10 +135,55 @@ pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) 
                 }
             }
         }
+        "qwen" => {
+            info!("🔍 Validating Qwen model...");
+            // Ensure qwen engine is initialized first
+            if let Err(init_error) = crate::qwen_engine::commands::qwen_init().await {
+                warn!("❌ Failed to initialize Qwen engine: {}", init_error);
+                return Err(format!(
+                    "Failed to initialize Qwen speech recognition: {}",
+                    init_error
+                ));
+            }
+
+            // For now, check if there are any available Qwen models
+            match crate::qwen_engine::commands::qwen_get_available_models().await {
+                Ok(models) => {
+                    // Find an available model
+                    let available_model = models.iter().find(|m| {
+                        if let Some(status) = m.get("status") {
+                            if let Some(status_str) = status.as_str() {
+                                return status_str == "\"Available\"" || status_str == "Available";
+                            }
+                        }
+                        false
+                    });
+
+                    if let Some(model) = available_model {
+                        let model_name = model.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+                        info!("✅ Qwen model validation successful: {} is ready", model_name);
+
+                        // Auto-load the first available model
+                        if let Err(e) = crate::qwen_engine::commands::qwen_load_model(model_name.to_string()).await {
+                            warn!("⚠️ Failed to auto-load Qwen model: {}", e);
+                            return Err(format!("Failed to load Qwen model '{}': {}", model_name, e));
+                        }
+
+                        Ok(())
+                    } else {
+                        Err("No Qwen models available. Please download a model from the settings.".to_string())
+                    }
+                }
+                Err(e) => {
+                    warn!("❌ Qwen model validation failed: {}", e);
+                    Err(e)
+                }
+            }
+        }
         other => {
             warn!("❌ Unsupported transcription provider for local recording: {}", other);
             Err(format!(
-                "Provider '{}' is not supported for local transcription. Please select 'localWhisper' or 'parakeet'.",
+                "Provider '{}' is not supported for local transcription. Please select 'localWhisper', 'parakeet', or 'qwen'.",
                 other
             ))
         }
@@ -184,6 +229,34 @@ pub async fn get_or_init_transcription_engine<R: Runtime>(
 
     // Initialize the appropriate engine based on provider
     match config.provider.as_str() {
+        "qwen" => {
+            info!("🌐 Initializing Qwen transcription engine");
+
+            // Get Qwen engine
+            let engine = {
+                let guard = crate::qwen_engine::commands::QWEN_ENGINE
+                    .lock()
+                    .await;
+                guard.as_ref().cloned()
+            };
+
+            match engine {
+                Some(engine) => {
+                    // Check if model is loaded
+                    if engine.is_model_loaded().await {
+                        let model_name = engine.get_current_model().await
+                            .unwrap_or_else(|| "unknown".to_string());
+                        info!("✅ Qwen model '{}' already loaded", model_name);
+                        Ok(TranscriptionEngine::Provider(Arc::new(crate::qwen_engine::QwenProvider::new(engine))))
+                    } else {
+                        Err("Qwen engine initialized but no model loaded. This should not happen after validation.".to_string())
+                    }
+                }
+                None => {
+                    Err("Qwen engine not initialized. This should not happen after validation.".to_string())
+                }
+            }
+        }
         "parakeet" => {
             info!("🦜 Initializing Parakeet transcription engine");
 

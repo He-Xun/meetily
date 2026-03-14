@@ -144,6 +144,7 @@
     "betaFeature": "测试功能",
     "localWhisperHighAccuracy": "本地 Whisper（高精度）",
     "parakeetRecommended": "Parakeet（推荐 - 实时/准确）",
+    "qwenMultilingual": "Qwen3-ASR（多语言）",
     "recording": "录音",
     "enhance": "增强"
   },

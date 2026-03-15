@@ -459,6 +459,9 @@ pub fn run() {
                 }
             });
 
+            // Set Qwen models directory
+            qwen_engine::commands::set_models_directory(&_app.handle());
+
             // Initialize ModelManager for summary engine (async, non-blocking)
             let app_handle_for_model_manager = _app.handle().clone();
             tauri::async_runtime::spawn(async move {

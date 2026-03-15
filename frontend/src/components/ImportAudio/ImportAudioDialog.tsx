@@ -357,7 +357,7 @@ export function ImportAudioDialog({
 
                   {/* Editable title */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">{t('meetingDetails.meetingTitle')}</label>
+                    <label className="text-sm font-medium text-gray-700">{t('sidebar.meetingTitleLabel')}</label>
                     <Input
                       value={title}
                       onChange={(e) => {

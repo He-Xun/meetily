@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false, // Disabled for BlockNote compatibility
-  // Use standalone mode for Tauri (not export, to avoid generateStaticParams requirement)
+  // Static export for Tauri desktop app
+  output: 'export',
   distDir: 'dist',
-  // Disable all forms of static optimization for Tauri desktop app
+  // Static export configuration for Tauri desktop app
   experimental: {
     serverComponentsExternalPackages: [],
   },

@@ -31,7 +31,7 @@ pub struct DownloadProgress {
 pub struct ModelInfo {
     pub name: String,
     pub size_mb: u64,
-    pub status: String, // Serialized status
+    pub status: crate::qwen_engine::model::ModelStatus,
     pub description: String,
     pub path: Option<String>,
 }
@@ -57,6 +57,7 @@ pub struct QwenEngine {
     models_dir: PathBuf,
     current_model: Arc<RwLock<Option<QwenModel>>>,
     available_models: Arc<RwLock<Vec<crate::qwen_engine::model::ModelInfo>>>,
+    cancel_token: Arc<tokio_util::sync::CancellationToken>,
 }
 
 impl QwenEngine {
@@ -71,6 +72,7 @@ impl QwenEngine {
             models_dir,
             current_model: Arc::new(RwLock::new(None)),
             available_models: Arc::new(RwLock::new(Vec::new())),
+            cancel_token: Arc::new(tokio_util::sync::CancellationToken::new()),
         })
     }
 
@@ -97,7 +99,18 @@ impl QwenEngine {
 
         for (name, size_mb, description) in known_models {
             let model_path = self.models_dir.join(name);
-            let status = if model_path.exists() {
+
+            // Check if model is actually available by verifying key files exist
+            let config_file = model_path.join("config.json");
+            let safetensors_1 = model_path.join("model-00001-of-00002.safetensors");
+            let safetensors_2 = model_path.join("model-00002-of-00002.safetensors");
+
+            let is_available = model_path.exists() &&
+                              config_file.exists() &&
+                              safetensors_1.exists() &&
+                              safetensors_2.exists();
+
+            let status = if is_available {
                 ModelStatus::Available
             } else {
                 ModelStatus::Missing
@@ -120,7 +133,7 @@ impl QwenEngine {
             .map(|m| ModelInfo {
                 name: m.name,
                 size_mb: m.size_mb,
-                status: serde_json::to_string(&m.status).unwrap_or_else(|_| "Unknown".to_string()),
+                status: m.status,
                 description: m.description,
                 path: m.path.map(|p| p.display().to_string()),
             })
@@ -190,6 +203,14 @@ impl QwenEngine {
         self.models_dir.join(model_name)
     }
 
+    /// Cancel the current download operation
+    pub async fn cancel_download(&self) {
+        log::info!("🌐 Cancelling current download operation");
+        self.cancel_token.cancel();
+        // Give the download operation a moment to notice the cancellation
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
     /// Delete a model
     pub async fn delete_model(&self, model_name: &str) -> Result<()> {
         let model_path = self.get_model_path(model_name);
@@ -220,6 +241,9 @@ impl QwenEngine {
     ) -> Result<()> {
         log::info!("🌐 Starting download for Qwen model: {}", model_name);
 
+        // Create a fresh cancellation token for this download
+        let cancel_token = self.cancel_token.child_token();
+
         // Check if model exists in our known models
         let models = self.available_models.read().await;
         let _model_info = models.iter().find(|m| m.name == model_name)
@@ -247,8 +271,17 @@ impl QwenEngine {
             _ => return Err(QwenEngineError::ModelNotFound(format!("Unknown model: {}", model_name)).into()),
         };
 
+        // Try multiple download sources in order
+        // 1. hf-mirror.com (fast for China, no auth required)
+        // 2. huggingface.co (official, may require auth for some models)
+        let download_bases = vec![
+            "https://hf-mirror.com",
+            "https://huggingface.co",
+        ];
+
         // Files to download
-        // Note: tokenizer.json needs to be generated using Python transformers
+        // Note: tokenizer.json is not available on HuggingFace for Qwen3-ASR models
+        // The qwen3-asr crate should work with tokenizer_config.json + vocab.json + merges.txt
         let required_files = vec![
             "config.json",
             "tokenizer_config.json",
@@ -262,23 +295,55 @@ impl QwenEngine {
             "model-00002-of-00002.safetensors",
         ];
 
+        // Optional files that may not exist on HuggingFace
+        let optional_files = vec!["tokenizer.json"];
+
         let total_files = required_files.len();
         let mut completed_files = 0;
+
+        // Calculate file weights for progress: safetensors files get 45% each, others split remaining 10%
+        // This makes progress smoother instead of jumping 10% per file
+        let get_file_weight = |filename: &str| -> f64 {
+            if filename.contains("safetensors") {
+                45.0  // Each safetensors file is ~45% of total
+            } else {
+                1.25   // Small files share the remaining 10% (8 files × 1.25% = 10%)
+            }
+        };
+
+        let mut total_weight: f64 = required_files.iter().map(|f| get_file_weight(f)).sum();
+        let mut completed_weight: f64 = 0.0;
 
         for (index, filename) in required_files.iter().enumerate() {
             let file_path = model_dir.join(filename);
 
-            // Skip if file already exists and has content
+            log::info!("🔍 Processing file {}/{}: {}", index + 1, total_files, filename);
+            log::info!("🔍 Target path: {}", file_path.display());
+
+            // Skip if file already exists and has valid content
+            // safetensors files should be large (>100MB), other files just need to exist
             if file_path.exists() {
                 let metadata = tokio::fs::metadata(&file_path).await
                     .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to check file: {}", e)))?;
 
-                if metadata.len() > 0 {
-                    log::info!("✓ Skipping existing file: {}", filename);
+                let file_size = metadata.len();
+                let is_safetensors = filename.contains("safetensors");
+                let is_valid = if is_safetensors {
+                    // safetensors files should be at least 100MB
+                    file_size > 100_000_000
+                } else {
+                    // Other files just need to exist and have content
+                    file_size > 0
+                };
+
+                if is_valid {
+                    log::info!("✓ Skipping existing valid file: {} ({} MB)", filename, file_size / 1_048_576);
+                    let file_weight = get_file_weight(filename);
+                    completed_weight += file_weight;
                     completed_files += 1;
-                    // Update progress
+                    // Update progress based on weight
                     if let Some(ref cb) = progress_callback {
-                        let progress = ((index + 1) * 100 / total_files) as u8;
+                        let progress = ((completed_weight / total_weight) * 100.0) as u8;
                         cb(progress);
                         {
                             let mut models = self.available_models.write().await;
@@ -288,88 +353,207 @@ impl QwenEngine {
                         }
                     }
                     continue;
+                } else {
+                    log::warn!("⚠️ File exists but invalid ({} bytes), re-downloading: {}", file_size, filename);
                 }
+            }
+
+            // Check for cancellation before starting download
+            if cancel_token.is_cancelled() {
+                log::warn!("⚠️ Download cancelled by user");
+                return Err(QwenEngineError::DownloadFailed("Download cancelled".to_string()).into());
             }
 
             log::info!("📥 Downloading file {}/{}: {}", index + 1, total_files, filename);
 
-            // Construct HuggingFace download URL
-            let url = format!("https://huggingface.co/{}/resolve/main/{}", repo_name, filename);
+            // Try multiple download sources
+            let mut download_success = false;
+            let mut last_error = None;
 
-            // Download with timeout
-            let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(3600)) // 1 hour timeout
-                .build()
-                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create HTTP client: {}", e)))?;
+            for base_url in &download_bases {
+                // Construct download URL
+                let url = format!("{}/{}/resolve/main/{}", base_url, repo_name, filename);
+                log::info!("📥 Trying: {}", url);
 
-            let response = client.get(&url).send().await
-                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to download {}: {}", filename, e)))?;
+                // Download with timeout and optional HuggingFace token
+                let client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(3600)) // 1 hour timeout
+                    .build()
+                    .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create HTTP client: {}", e)))?;
 
-            if !response.status().is_success() {
+                // Try to get HuggingFace token from environment (only for official HF)
+                let hf_token = if *base_url == "https://huggingface.co" {
+                    std::env::var("HUGGINGFACE_TOKEN").ok()
+                } else {
+                    None
+                };
+
+                log::info!("📥 Starting HTTP request from {}...", base_url);
+                let mut request = client.get(&url);
+
+                // Add authorization header if token is available
+                if let Some(token) = &hf_token {
+                    log::info!("🔑 Using HuggingFace token for authentication");
+                    request = request.header("Authorization", format!("Bearer {}", token));
+                }
+
+                match request.send().await {
+                    Ok(response) => {
+                        if response.status().is_success() {
+                            log::info!("✅ Successfully started download from {}", base_url);
+
+                            // Get total file size for progress tracking
+                            let total_size = response.content_length().unwrap_or(0);
+
+                            // Download in chunks and write to file
+                            let mut file = tokio::fs::File::create(&file_path).await
+                                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create file {}: {}", filename, e)))?;
+
+                            let mut downloaded: u64 = 0;
+                            let mut stream = response.bytes_stream();
+
+                            use futures_util::StreamExt;
+                            let mut download_complete = false;
+
+                            while let Some(chunk_result) = stream.next().await {
+                                // Check for cancellation during download
+                                if cancel_token.is_cancelled() {
+                                    log::warn!("⚠️ Download cancelled during file transfer: {}", filename);
+                                    // Clean up partial file
+                                    let _ = tokio::fs::remove_file(&file_path).await;
+                                    return Err(QwenEngineError::DownloadFailed("Download cancelled".to_string()).into());
+                                }
+
+                                let chunk = chunk_result
+                                    .map_err(|e| QwenEngineError::DownloadFailed(format!("Download error for {}: {}", filename, e)))?;
+
+                                tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await
+                                    .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to write file {}: {}", filename, e)))?;
+
+                                downloaded += chunk.len() as u64;
+
+                                // Update progress for large files with weight-based calculation
+                                if total_size > 0 && total_size > 100_000_000 { // Only for files > 100MB
+                                    let file_weight = get_file_weight(filename);
+                                    let file_progress = (downloaded as f64 / total_size as f64) * file_weight;
+                                    let overall_progress = ((completed_weight + file_progress) / total_weight * 100.0) as u8;
+
+                                    if let Some(ref cb) = progress_callback {
+                                        cb(overall_progress);
+                                        {
+                                            let mut models = self.available_models.write().await;
+                                            if let Some(model) = models.iter_mut().find(|m| m.name == model_name) {
+                                                model.status = crate::qwen_engine::model::ModelStatus::Downloading { progress: overall_progress };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            download_complete = true;
+                            download_success = true;
+                            log::info!("✅ Download completed from {}", base_url);
+                            break;
+                        } else {
+                            let status = response.status();
+                            log::warn!("⚠️ HTTP {} from {} (trying next source)", status, base_url);
+                            last_error = Some(format!("HTTP {}", status));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("⚠️ Failed to download from {}: {} (trying next source)", base_url, e);
+                        last_error = Some(format!("Network error: {}", e));
+                    }
+                }
+            }
+
+            if !download_success {
                 return Err(QwenEngineError::DownloadFailed(
-                    format!("Failed to download {}: HTTP {}", filename, response.status())
+                    format!("Failed to download {} from all sources. Last error: {}", filename, last_error.unwrap_or_else(|| "Unknown error".to_string()))
                 ).into());
             }
 
-            // Get total file size for progress tracking
-            let total_size = response.content_length().unwrap_or(0);
-
-            // Download in chunks and write to file
-            let mut file = tokio::fs::File::create(&file_path).await
-                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create file {}: {}", filename, e)))?;
-
-            let mut downloaded: u64 = 0;
-            let mut stream = response.bytes_stream();
-
-            use futures_util::StreamExt;
-            while let Some(chunk_result) = stream.next().await {
-                let chunk = chunk_result
-                    .map_err(|e| QwenEngineError::DownloadFailed(format!("Download error for {}: {}", filename, e)))?;
-
-                tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await
-                    .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to write file {}: {}", filename, e)))?;
-
-                downloaded += chunk.len() as u64;
-
-                // Update progress for large files
-                if total_size > 0 && total_size > 100_000_000 { // Only for files > 100MB
-                    let file_progress = ((downloaded as f64 / total_size as f64) * 100.0) as u8;
-                    let overall_progress = ((completed_files * 100 + (index * 100 + file_progress as usize)) / total_files) as u8;
-
-                    if let Some(ref cb) = progress_callback {
-                        cb(overall_progress);
-                        {
-                            let mut models = self.available_models.write().await;
-                            if let Some(model) = models.iter_mut().find(|m| m.name == model_name) {
-                                model.status = crate::qwen_engine::model::ModelStatus::Downloading { progress: overall_progress };
-                            }
-                        }
-                    }
-                }
-            }
-
+            // Add completed file weight
+            let file_weight = get_file_weight(filename);
+            completed_weight += file_weight;
             completed_files += 1;
-            log::info!("✓ Downloaded: {} ({:.2} MB)", filename, downloaded as f64 / 1_048_576.0);
 
-            // Update progress after each file
-            if let Some(ref cb) = progress_callback {
-                let progress = ((index + 1) * 100 / total_files) as u8;
-                cb(progress);
-                {
-                    let mut models = self.available_models.write().await;
-                    if let Some(model) = models.iter_mut().find(|m| m.name == model_name) {
-                        model.status = crate::qwen_engine::model::ModelStatus::Downloading { progress };
-                    }
-                }
+            // Verify file was actually written
+            if !file_path.exists() {
+                return Err(QwenEngineError::DownloadFailed(
+                    format!("File download completed but file not found: {}", filename)
+                ).into());
             }
+
+            let metadata = std::fs::metadata(&file_path)
+                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to verify file {}: {}", filename, e)))?;
+            let final_size = metadata.len();
+            let downloaded_mb = final_size as f64 / 1_048_576.0;
+            log::info!("✓ Downloaded: {} ({:.2} MB) - {}/{} files complete", filename, downloaded_mb, completed_files, total_files);
+
         }
 
-        // Generate tokenizer.json if it doesn't exist
-        let tokenizer_path = model_dir.join("tokenizer.json");
-        if !tokenizer_path.exists() {
-            log::info!("⚠️ Note: tokenizer.json needs to be generated using Python transformers");
-            log::info!("⚠️ Please run: python -c \"from transformers import AutoTokenizer; tok = AutoTokenizer.from_pretrained('{}', trust_remote_code=True); tok.backend_tokenizer.save('{}')\"",
-                repo_name, model_dir.display());
+        // Download optional files (if available on HuggingFace)
+        log::info!("📦 Downloading optional files...");
+        for filename in optional_files {
+            let file_path = model_dir.join(filename);
+
+            // Skip if file already exists
+            if file_path.exists() {
+                log::info!("✓ Optional file already exists: {}", filename);
+                continue;
+            }
+
+            log::info!("📥 Attempting optional file: {} (may not exist on HuggingFace)", filename);
+
+            let url = format!("https://huggingface.co/{}/resolve/main/{}", repo_name, filename);
+
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(60)) // Shorter timeout for optional files
+                .build()
+                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create HTTP client: {}", e)))?;
+
+            // Try to get HuggingFace token from environment
+            let hf_token = std::env::var("HUGGINGFACE_TOKEN").ok();
+
+            let mut request = client.get(&url);
+            if let Some(token) = &hf_token {
+                request = request.header("Authorization", format!("Bearer {}", token));
+            }
+
+            let response = request.send().await;
+
+            match response {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let _total_size = resp.content_length().unwrap_or(0);
+
+                        let mut file = tokio::fs::File::create(&file_path).await
+                            .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to create file {}: {}", filename, e)))?;
+
+                        let mut downloaded: u64 = 0;
+                        let mut stream = resp.bytes_stream();
+
+                        use futures_util::StreamExt;
+                        while let Some(chunk_result) = stream.next().await {
+                            let chunk = chunk_result
+                                .map_err(|e| QwenEngineError::DownloadFailed(format!("Download error for {}: {}", filename, e)))?;
+
+                            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await
+                                .map_err(|e| QwenEngineError::DownloadFailed(format!("Failed to write file {}: {}", filename, e)))?;
+
+                            downloaded += chunk.len() as u64;
+                        }
+
+                        log::info!("✓ Downloaded optional file: {} ({:.2} MB)", filename, downloaded as f64 / 1_048_576.0);
+                    } else {
+                        log::info!("ℹ️ Optional file not found on HuggingFace: {} (status: {})", filename, resp.status());
+                    }
+                }
+                Err(e) => {
+                    log::info!("ℹ️ Optional file download failed (this is OK): {} - {}", filename, e);
+                }
+            }
         }
 
         // Update model status to Available

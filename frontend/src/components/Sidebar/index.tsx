@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Settings, ChevronLeftCircle, ChevronRightCircle, Calendar, StickyNote, Home, Trash2, Mic, Square, Search, Pencil, NotebookPen, SearchIcon, X, Upload, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronRight, Settings, ChevronLeftCircle, ChevronRightCircle, Calendar, StickyNote, Home, Trash2, Mic, Square, Search, Pencil, NotebookPen, SearchIcon, X, Upload, MoreHorizontal, Globe, Check } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSidebar } from './SidebarProvider';
 import type { CurrentMeeting } from '@/components/Sidebar/SidebarProvider';
@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 import { useImportDialog } from '@/contexts/ImportDialogContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useI18n } from '@/i18n';
+import { useI18n, locales, Locale } from '@/i18n';
 
 import {
   Dialog,
@@ -63,7 +63,7 @@ const Sidebar: React.FC = () => {
   const { openImportDialog } = useImportDialog();
   const config = useConfig();
   const betaFeatures = config?.betaFeatures;
-  const { t } = useI18n();
+  const { t, locale, setLocale, localeNames } = useI18n();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['meetings']));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showModelSettings, setShowModelSettings] = useState(false);
@@ -108,6 +108,7 @@ const Sidebar: React.FC = () => {
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; itemId: string | null }>({ isOpen: false, itemId: null });
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   useEffect(() => {
     // Note: Don't set hardcoded defaults - let DB be the source of truth
@@ -457,93 +458,113 @@ const Sidebar: React.FC = () => {
 
     return (
       <TooltipProvider>
-        <div className="flex flex-col items-center space-y-4 mt-4">
-          <Logo isCollapsed={isCollapsed} />
+        <div className="flex flex-col items-center space-y-4 mt-4 h-full">
+          <div className="flex flex-col items-center space-y-4">
+            <Logo isCollapsed={isCollapsed} />
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => router.push('/')}
-                className={`p-2 rounded-lg transition-colors duration-150 ${isHomePage ? 'bg-gray-100' : 'hover:bg-gray-100'
-                  }`}
-              >
-                <Home className="w-5 h-5 text-gray-600" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{t('common.home')}</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={handleRecordingToggle}
-                disabled={isRecording}
-                className={`p-2 ${isRecording ? 'bg-red-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'} rounded-full transition-colors duration-150 shadow-sm`}
-              >
-                {isRecording ? (
-                  <Square className="w-5 h-5 text-white" />
-                ) : (
-                  <Mic className="w-5 h-5 text-white" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{isRecording ? t('recording.recordingInProgress') : t('recording.startRecording')}</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {betaFeatures.importAndRetranscribe && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => openImportDialog()}
-                  className="p-2 rounded-lg transition-colors duration-150 hover:bg-blue-100 bg-blue-50"
+                  onClick={() => router.push('/')}
+                  className={`p-2 rounded-lg transition-colors duration-150 ${isHomePage ? 'bg-gray-100' : 'hover:bg-gray-100'
+                    }`}
                 >
-                  <Upload className="w-5 h-5 text-blue-600" />
+                  <Home className="w-5 h-5 text-gray-600" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p>{t('sidebar.importAudio')}</p>
+                <p>{t('common.home')}</p>
               </TooltipContent>
             </Tooltip>
-          )}
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => {
-                  if (isCollapsed) toggleCollapse();
-                  toggleFolder('meetings');
-                }}
-                className={`p-2 rounded-lg transition-colors duration-150 ${isMeetingPage ? 'bg-gray-100' : 'hover:bg-gray-100'
-                  }`}
-              >
-                <NotebookPen className="w-5 h-5 text-gray-600" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{t('sidebar.meetingNotes')}</p>
-            </TooltipContent>
-          </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleRecordingToggle}
+                  disabled={isRecording}
+                  className={`p-2 ${isRecording ? 'bg-red-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'} rounded-full transition-colors duration-150 shadow-sm`}
+                >
+                  {isRecording ? (
+                    <Square className="w-5 h-5 text-white" />
+                  ) : (
+                    <Mic className="w-5 h-5 text-white" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{isRecording ? t('recording.recordingInProgress') : t('recording.startRecording')}</p>
+              </TooltipContent>
+            </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => router.push('/settings')}
-                className={`p-2 rounded-lg transition-colors duration-150 ${isSettingsPage ? 'bg-gray-100' : 'hover:bg-gray-100'
-                  }`}
-              >
-                <Settings className="w-5 h-5 text-gray-600" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{t('sidebar.settings')}</p>
-            </TooltipContent>
-          </Tooltip>
+            {betaFeatures.importAndRetranscribe && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openImportDialog()}
+                    className="p-2 rounded-lg transition-colors duration-150 hover:bg-blue-100 bg-blue-50"
+                  >
+                    <Upload className="w-5 h-5 text-blue-600" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>{t('sidebar.importAudio')}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
-          <Info isCollapsed={isCollapsed} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    if (isCollapsed) toggleCollapse();
+                    toggleFolder('meetings');
+                  }}
+                  className={`p-2 rounded-lg transition-colors duration-150 ${isMeetingPage ? 'bg-gray-100' : 'hover:bg-gray-100'
+                    }`}
+                >
+                  <NotebookPen className="w-5 h-5 text-gray-600" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{t('sidebar.meetingNotes')}</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => router.push('/settings')}
+                  className={`p-2 rounded-lg transition-colors duration-150 ${isSettingsPage ? 'bg-gray-100' : 'hover:bg-gray-100'
+                    }`}
+                >
+                  <Settings className="w-5 h-5 text-gray-600" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{t('sidebar.settings')}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="flex flex-col items-center space-y-2 pb-2">
+            <Info isCollapsed={isCollapsed} />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                  className="p-2 rounded-lg transition-colors duration-150 hover:bg-gray-100"
+                >
+                  <Globe className="w-5 h-5 text-gray-600" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{t('settings.interfaceLanguage')}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </TooltipProvider>
     );
@@ -578,15 +599,25 @@ const Sidebar: React.FC = () => {
             }`}
           style={item.type === 'folder' && depth === 0 ? {} : {}}
           onClick={() => {
+            console.log('[Sidebar] Clicked item:', item.id, item.title);
+
             // Close menu when clicking other items
-            if (openMenuId) setOpenMenuId(null);
+            if (openMenuId) {
+              console.log('[Sidebar] Closing menu, openMenuId:', openMenuId);
+              setOpenMenuId(null);
+            }
 
             if (item.type === 'folder') {
+              console.log('[Sidebar] Toggling folder:', item.id);
               toggleFolder(item.id);
             } else {
+              console.log('[Sidebar] Setting current meeting and navigating');
               setCurrentMeeting({ id: item.id, title: item.title });
+
               const basePath = item.id.startsWith('intro-call') ? '/' :
                 item.id.includes('-') ? `/meeting-details?id=${item.id}` : `/notes/${item.id}`;
+
+              console.log('[Sidebar] Navigating to:', basePath);
               router.push(basePath);
             }
           }}
@@ -621,10 +652,16 @@ const Sidebar: React.FC = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       setOpenMenuId(openMenuId === item.id ? null : item.id);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
                     }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5"
                     aria-label="More options"
+                    style={{ pointerEvents: 'auto' }}
                   >
                     <MoreHorizontal className="w-3.5 h-3.5 text-gray-700" />
                   </button>
@@ -788,7 +825,7 @@ const Sidebar: React.FC = () => {
         {/* Footer */}
         {!isCollapsed && (
 
-          <div className="flex-shrink-0 p-2 border-t border-gray-100">
+          <div className="flex-shrink-0 p-2 border-t border-gray-100 space-y-2">
             <button
               onClick={handleRecordingToggle}
               disabled={isRecording}
@@ -810,7 +847,7 @@ const Sidebar: React.FC = () => {
             {betaFeatures.importAndRetranscribe && (
               <button
                 onClick={() => openImportDialog()}
-                className="w-full flex items-center justify-center px-3 py-2 mt-1 text-sm font-medium text-gray-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors shadow-sm"
+                className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors shadow-sm"
               >
                 <Upload className="w-4 h-4 mr-2" />
                 <span>{t('common.importAudio')}</span>
@@ -819,11 +856,12 @@ const Sidebar: React.FC = () => {
 
             <button
               onClick={() => router.push('/settings')}
-              className="w-full flex items-center justify-center px-3 py-1.5 mt-1 mb-1 text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors shadow-sm"
+              className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors shadow-sm"
             >
               <Settings className="w-4 h-4 mr-2" />
               <span>{t('common.settings')}</span>
             </button>
+
             <Info isCollapsed={isCollapsed} />
             <div className="w-full flex items-center justify-center px-3 py-1 text-xs text-gray-400">
               v0.3.0
@@ -890,6 +928,30 @@ const Sidebar: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Language Selection Menu */}
+      {showLanguageMenu && (
+        <div className="fixed left-16 bottom-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[160px]">
+          <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b border-gray-100">
+            {t('settings.interfaceLanguage')}
+          </div>
+          {locales.map((loc) => (
+            <button
+              key={loc}
+              onClick={() => {
+                setLocale(loc as Locale);
+                setShowLanguageMenu(false);
+              }}
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                locale === loc ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+              }`}
+            >
+              <span>{localeNames[loc]}</span>
+              {locale === loc && <Check className="w-4 h-4" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

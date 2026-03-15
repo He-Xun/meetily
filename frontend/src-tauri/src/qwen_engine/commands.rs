@@ -1,13 +1,47 @@
 //! Tauri command interface for Qwen3-ASR engine
 
 use crate::qwen_engine::qwen_engine::QwenEngine;
-use std::sync::Arc;
+use crate::qwen_engine::model::ModelStatus;
+use std::sync::{Arc, Mutex as StdMutex};
+use std::path::PathBuf;
 use tokio::sync::Mutex;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime, Manager};
 use log::{info, warn};
 
 /// Global Qwen engine instance
 pub static QWEN_ENGINE: Mutex<Option<Arc<QwenEngine>>> = Mutex::const_new(None);
+
+/// Global models directory path (set during app initialization)
+static MODELS_DIR: StdMutex<Option<PathBuf>> = StdMutex::new(None);
+
+/// Initialize the models directory path using app_data_dir
+/// This should be called during app setup before qwen_init
+pub fn set_models_directory<R: Runtime>(_app: &AppHandle<R>) {
+    // Use the same path as QwenEngine::get_models_directory()
+    // ~/.meetily/qwen_models
+    let models_dir = dirs::home_dir()
+        .expect("Failed to get home directory")
+        .join(".meetily")
+        .join("qwen_models");
+
+    // Create directory if it doesn't exist
+    if !models_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&models_dir) {
+            log::error!("Failed to create Qwen models directory: {}", e);
+            return;
+        }
+    }
+
+    log::info!("Qwen models directory set to: {}", models_dir.display());
+
+    let mut guard = MODELS_DIR.lock().unwrap();
+    *guard = Some(models_dir);
+}
+
+/// Get the configured models directory
+fn get_models_directory() -> Option<PathBuf> {
+    MODELS_DIR.lock().unwrap().clone()
+}
 
 /// Initialize the Qwen engine
 #[tauri::command]
@@ -33,20 +67,68 @@ pub async fn qwen_init() -> Result<(), String> {
 
 /// Get list of available Qwen models
 #[tauri::command]
-pub async fn qwen_get_available_models() -> Result<Vec<serde_json::Value>, String> {
-    let engine = get_engine().await?;
+pub async fn qwen_get_available_models() -> Result<Vec<crate::qwen_engine::qwen_engine::ModelInfo>, String> {
+    let engine = {
+        let guard = QWEN_ENGINE.lock().await;
+        guard.as_ref().cloned()
+    };
 
-    let models = engine.discover_models()
-        .await
-        .map_err(|e| format!("Failed to get models: {}", e))?;
+    if let Some(engine) = engine {
+        engine.discover_models()
+            .await
+            .map_err(|e| format!("Failed to get models: {}", e))
+    } else {
+        // Fallback: scan models directory directly without initialized engine
+        log::info!("Qwen engine not initialized, scanning models directory directly");
+        discover_models_standalone()
+    }
+}
 
-    // Convert to serde_json::Value for frontend compatibility
-    let json_models: Vec<serde_json::Value> = models
-        .into_iter()
-        .map(|m| serde_json::json!(m))
-        .collect();
+/// Discover Qwen models by scanning the models directory directly
+/// Used when the Qwen engine isn't initialized
+fn discover_models_standalone() -> Result<Vec<crate::qwen_engine::qwen_engine::ModelInfo>, String> {
+    let models_dir = get_models_directory()
+        .ok_or_else(|| "Qwen models directory not initialized".to_string())?;
 
-    Ok(json_models)
+    log::info!("Scanning for Qwen models in: {}", models_dir.display());
+
+    // Define available Qwen models
+    let known_models = vec![
+        ("qwen3-asr-1.7b", 3200u64, "Qwen3-ASR 1.7B - 多语言高精度"),
+        ("qwen3-asr-0.6b", 1200u64, "Qwen3-ASR 0.6B - 轻量高效"),
+    ];
+
+    let mut models = Vec::new();
+
+    for (name, size_mb, description) in known_models {
+        let model_path = models_dir.join(name);
+
+        // Check if model is actually available by verifying key files exist
+        let config_file = model_path.join("config.json");
+        let safetensors_1 = model_path.join("model-00001-of-00002.safetensors");
+        let safetensors_2 = model_path.join("model-00002-of-00002.safetensors");
+
+        let is_available = model_path.exists() &&
+                          config_file.exists() &&
+                          safetensors_1.exists() &&
+                          safetensors_2.exists();
+
+        let status = if is_available {
+            ModelStatus::Available
+        } else {
+            ModelStatus::Missing
+        };
+
+        models.push(crate::qwen_engine::qwen_engine::ModelInfo {
+            name: name.to_string(),
+            size_mb,
+            status,
+            description: description.to_string(),
+            path: Some(model_path.display().to_string()),
+        });
+    }
+
+    Ok(models)
 }
 
 /// Download a Qwen model
@@ -109,7 +191,14 @@ pub async fn qwen_download_model(
 pub async fn qwen_cancel_download(model_name: String) -> Result<(), String> {
     info!("🌐 Cancelling download for Qwen model: {}", model_name);
 
-    // TODO: Implement download cancellation
+    let engine = get_engine().await?;
+
+    // Trigger cancellation - this will cause download to fail and clean up partial files
+    engine.cancel_download().await;
+
+    // Refresh model discovery to update status
+    let _ = engine.discover_models().await;
+
     Ok(())
 }
 

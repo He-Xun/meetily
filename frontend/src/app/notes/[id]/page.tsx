@@ -1,7 +1,15 @@
-'use client'
-
 import React from 'react';
 import { Clock, Users, Calendar, Tag } from 'lucide-react';
+
+// Generate static params for static export
+export function generateStaticParams() {
+  return [
+    { id: 'team-sync-dec-26' },
+    { id: 'product-review' },
+    { id: 'project-ideas' },
+    { id: 'action-items' },
+  ];
+}
 
 interface PageProps {
   params: {
@@ -19,7 +27,6 @@ interface Note {
 }
 
 const NotePage = ({ params }: PageProps) => {
-  // This would normally come from your database
   const sampleData: Record<string, Note> = {
     'team-sync-dec-26': {
       title: 'Team Sync - Dec 26',

@@ -4,8 +4,9 @@ use crate::audio::decoder::decode_audio_file;
 use crate::audio::vad::get_speech_chunks_with_progress;
 use super::common::{create_transcript_segments, split_segment_at_silence, write_transcripts_json};
 use super::constants::AUDIO_EXTENSIONS;
-use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL};
+use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL, DEFAULT_QWEN_MODEL};
 use crate::parakeet_engine::ParakeetEngine;
+use crate::qwen_engine::QwenEngine;
 use crate::state::AppState;
 use crate::whisper_engine::WhisperEngine;
 use anyhow::{anyhow, Result};
@@ -101,11 +102,11 @@ pub async fn start_retranscription<R: Runtime>(
     // Reset cancellation flag
     RETRANSCRIPTION_CANCELLED.store(false, Ordering::SeqCst);
 
-    let use_parakeet = provider.as_deref() == Some("parakeet");
-    let result = run_retranscription(app.clone(), meeting_id.clone(), meeting_folder_path, language, model, provider).await;
+    let provider_ref = provider.as_deref().unwrap_or("localWhisper");
+    let result = run_retranscription(app.clone(), meeting_id.clone(), meeting_folder_path, language, model, provider.clone()).await;
 
     // Unload the engine after the batch job (success, failure, or cancellation)
-    super::common::unload_engine_after_batch(use_parakeet).await;
+    super::common::unload_engine_after_batch(provider_ref).await;
 
     // Guard will automatically clear flag on drop
     // No need for manual: RETRANSCRIPTION_IN_PROGRESS.store(false, Ordering::SeqCst);
@@ -181,7 +182,9 @@ async fn run_retranscription<R: Runtime>(
     let audio_path = find_audio_file(&folder_path)?;
 
     // Determine which provider to use (default to whisper)
-    let use_parakeet = provider.as_deref() == Some("parakeet");
+    let provider = provider.as_deref().unwrap_or("localWhisper");
+    let use_parakeet = provider == "parakeet";
+    let use_qwen = provider == "qwen";
 
     info!(
         "Starting retranscription for meeting {} with language {:?}, model {:?}, provider {:?}",
@@ -299,13 +302,18 @@ async fn run_retranscription<R: Runtime>(
     emit_progress(&app, &meeting_id, "transcribing", 25, "Loading transcription engine...");
 
     // Initialize the appropriate engine once (not per-segment)
-    let whisper_engine = if !use_parakeet {
+    let whisper_engine = if !use_parakeet && !use_qwen {
         Some(get_or_init_whisper(&app, model.as_deref()).await?)
     } else {
         None
     };
     let parakeet_engine = if use_parakeet {
         Some(get_or_init_parakeet(&app, model.as_deref()).await?)
+    } else {
+        None
+    };
+    let qwen_engine = if use_qwen {
+        Some(get_or_init_qwen(&app, model.as_deref()).await?)
     } else {
         None
     };
@@ -368,7 +376,14 @@ async fn run_retranscription<R: Runtime>(
         }
 
         // Transcribe this segment
-        let (text, conf) = if use_parakeet {
+        let (text, conf) = if use_qwen {
+            let engine = qwen_engine.as_ref().unwrap();
+            let result = engine
+                .transcribe(segment.samples.clone(), language.clone())
+                .await
+                .map_err(|e| anyhow!("Qwen transcription failed on segment {}: {}", i, e))?;
+            (result.text, result.confidence.unwrap_or(0.9f32))
+        } else if use_parakeet {
             let engine = parakeet_engine.as_ref().unwrap();
             let text = engine
                 .transcribe_audio(segment.samples.clone())
@@ -716,6 +731,111 @@ async fn get_configured_parakeet_model<R: Runtime>(app: &AppHandle<R>) -> Result
             // Default to configured Parakeet model if no config exists
             warn!("No transcript config found, using default Parakeet model");
             Ok(DEFAULT_PARAKEET_MODEL.to_string())
+        }
+    }
+}
+
+/// Get or initialize the Qwen engine, auto-loading the model if needed
+async fn get_or_init_qwen<R: Runtime>(
+    app: &AppHandle<R>,
+    requested_model: Option<&str>,
+) -> Result<Arc<QwenEngine>> {
+    use crate::qwen_engine::commands::QWEN_ENGINE;
+
+    // Ensure Qwen engine is initialized first
+    if let Err(e) = crate::qwen_engine::commands::qwen_init().await {
+        return Err(anyhow!("Failed to initialize Qwen engine: {}", e));
+    }
+
+    let engine = {
+        let guard = QWEN_ENGINE.lock().await;
+        guard.as_ref().cloned()
+    };
+
+    match engine {
+        Some(e) => {
+            // Determine which model to use
+            let target_model = match requested_model {
+                Some(model) => model.to_string(),
+                None => get_configured_qwen_model(app).await?,
+            };
+
+            // Check if the correct model is already loaded
+            let current_model = e.get_current_model().await;
+            let needs_load = match &current_model {
+                Some(loaded) => loaded != &target_model,
+                None => true,
+            };
+
+            if needs_load {
+                info!(
+                    "Loading Qwen model '{}' (current: {:?})",
+                    target_model, current_model
+                );
+
+                // Discover available models first
+                info!("Discovering available Qwen models...");
+                if let Err(discover_err) = e.discover_models().await {
+                    warn!("Error during Qwen model discovery (continuing anyway): {}", discover_err);
+                }
+
+                match e.load_model(&target_model).await {
+                    Ok(_) => {
+                        info!("Qwen model '{}' loaded successfully", target_model);
+                        Ok(e)
+                    }
+                    Err(load_err) => {
+                        error!("Failed to load Qwen model '{}': {}", target_model, load_err);
+                        Err(anyhow!("Failed to load Qwen model '{}': {}", target_model, load_err))
+                    }
+                }
+            } else {
+                info!("Qwen model '{}' already loaded", target_model);
+                Ok(e)
+            }
+        }
+        None => Err(anyhow!("Qwen engine not initialized")),
+    }
+}
+
+/// Get the configured Qwen model name from the database
+async fn get_configured_qwen_model<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
+    debug!("Getting configured Qwen model from database...");
+
+    let app_state = app
+        .try_state::<AppState>()
+        .ok_or_else(|| {
+            error!("App state not available");
+            anyhow!("App state not available")
+        })?;
+
+    // Query the transcript settings from the database
+    let result: Option<(String, String)> = sqlx::query_as(
+        "SELECT provider, model FROM transcript_settings WHERE id = '1'"
+    )
+    .fetch_optional(app_state.db_manager.pool())
+    .await
+    .map_err(|e| {
+        error!("Failed to query transcript config: {}", e);
+        anyhow!("Failed to query transcript config: {}", e)
+    })?;
+
+    match result {
+        Some((provider, model)) => {
+            info!("Found transcript config: provider={}, model={}", provider, model);
+
+            if provider == "qwen" {
+                Ok(model)
+            } else {
+                // Default to configured Qwen model
+                warn!("Configured provider is not Qwen, using default model");
+                Ok(DEFAULT_QWEN_MODEL.to_string())
+            }
+        },
+        None => {
+            // Default to configured Qwen model if no config exists
+            warn!("No transcript config found, using default Qwen model");
+            Ok(DEFAULT_QWEN_MODEL.to_string())
         }
     }
 }

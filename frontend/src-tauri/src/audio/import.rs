@@ -3,8 +3,9 @@
 use crate::api::TranscriptSegment;
 use crate::audio::decoder::{decode_audio_file, decode_audio_file_with_progress};
 use crate::audio::vad::get_speech_chunks_with_progress;
-use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL};
+use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL, DEFAULT_QWEN_MODEL};
 use crate::parakeet_engine::ParakeetEngine;
+use crate::qwen_engine::QwenEngine;
 use crate::state::AppState;
 use crate::whisper_engine::WhisperEngine;
 use anyhow::{anyhow, Result};
@@ -265,19 +266,19 @@ pub async fn start_import<R: Runtime>(
     // Reset cancellation flag
     IMPORT_CANCELLED.store(false, Ordering::SeqCst);
 
-    let use_parakeet = provider.as_deref() == Some("parakeet");
+    let provider_ref = provider.as_deref().unwrap_or("localWhisper");
     let result = run_import(
         app.clone(),
         source_path,
         title,
         language,
         model,
-        provider,
+        provider.clone(),
     )
     .await;
 
     // Unload the engine after the batch job (success, failure, or cancellation)
-    super::common::unload_engine_after_batch(use_parakeet).await;
+    super::common::unload_engine_after_batch(provider_ref).await;
 
     // Guard will automatically clear flag on drop
     // No need for manual: IMPORT_IN_PROGRESS.store(false, Ordering::SeqCst);
@@ -329,7 +330,9 @@ async fn run_import<R: Runtime>(
     );
 
     // Determine which provider to use (default to whisper)
-    let use_parakeet = provider.as_deref() == Some("parakeet");
+    let provider = provider.as_deref().unwrap_or("localWhisper");
+    let use_parakeet = provider == "parakeet";
+    let use_qwen = provider == "qwen";
 
     emit_progress(&app, "copying", 5, "Creating meeting folder...");
 
@@ -508,13 +511,18 @@ async fn run_import<R: Runtime>(
     emit_progress(&app, "transcribing", 30, "Loading transcription engine...");
 
     // Initialize the appropriate engine
-    let whisper_engine = if !use_parakeet && total_segments > 0 {
+    let whisper_engine = if !use_parakeet && !use_qwen && total_segments > 0 {
         Some(get_or_init_whisper(&app, model.as_deref()).await?)
     } else {
         None
     };
     let parakeet_engine = if use_parakeet && total_segments > 0 {
         Some(get_or_init_parakeet(&app, model.as_deref()).await?)
+    } else {
+        None
+    };
+    let qwen_engine = if use_qwen && total_segments > 0 {
+        Some(get_or_init_qwen(&app, model.as_deref()).await?)
     } else {
         None
     };
@@ -579,7 +587,14 @@ async fn run_import<R: Runtime>(
         }
 
         // Transcribe
-        let (text, conf) = if use_parakeet {
+        let (text, conf) = if use_qwen {
+            let engine = qwen_engine.as_ref().unwrap();
+            let result = engine
+                .transcribe(segment.samples.clone(), language.clone())
+                .await
+                .map_err(|e| anyhow!("Qwen transcription failed on segment {}: {}", i, e))?;
+            (result.text, result.confidence.unwrap_or(0.9f32))
+        } else if use_parakeet {
             let engine = parakeet_engine.as_ref().unwrap();
             let text = engine
                 .transcribe_audio(segment.samples.clone())
@@ -839,6 +854,58 @@ async fn get_or_init_parakeet<R: Runtime>(
     }
 }
 
+/// Get or initialize the Qwen engine
+async fn get_or_init_qwen<R: Runtime>(
+    app: &AppHandle<R>,
+    requested_model: Option<&str>,
+) -> Result<Arc<QwenEngine>> {
+    use crate::qwen_engine::commands::QWEN_ENGINE;
+
+    // Ensure Qwen engine is initialized first
+    if let Err(e) = crate::qwen_engine::commands::qwen_init().await {
+        return Err(anyhow!("Failed to initialize Qwen engine: {}", e));
+    }
+
+    let engine = {
+        let guard = QWEN_ENGINE.lock().await;
+        guard.as_ref().cloned()
+    };
+
+    match engine {
+        Some(e) => {
+            let target_model = match requested_model {
+                Some(model) => model.to_string(),
+                None => get_configured_model(app, "qwen").await?,
+            };
+
+            let current_model = e.get_current_model().await;
+            let needs_load = match &current_model {
+                Some(loaded) => loaded != &target_model,
+                None => true,
+            };
+
+            if needs_load {
+                info!(
+                    "Loading Qwen model '{}' (current: {:?})",
+                    target_model, current_model
+                );
+
+                // Discover models to ensure the model list is populated
+                if let Err(e) = e.discover_models().await {
+                    warn!("Model discovery error (continuing): {}", e);
+                }
+
+                e.load_model(&target_model)
+                    .await
+                    .map_err(|e| anyhow!("Failed to load model '{}': {}", target_model, e))?;
+            }
+
+            Ok(e)
+        }
+        None => Err(anyhow!("Qwen engine not initialized")),
+    }
+}
+
 /// Get the configured model from database
 async fn get_configured_model<R: Runtime>(app: &AppHandle<R>, provider_type: &str) -> Result<String> {
     let app_state = app
@@ -856,12 +923,15 @@ async fn get_configured_model<R: Runtime>(app: &AppHandle<R>, provider_type: &st
         Some((provider, model)) => {
             if (provider_type == "whisper" && (provider == "localWhisper" || provider == "whisper"))
                 || (provider_type == "parakeet" && provider == "parakeet")
+                || (provider_type == "qwen" && provider == "qwen")
             {
                 Ok(model)
             } else {
                 // Return default model for the requested type
                 Ok(if provider_type == "parakeet" {
                     DEFAULT_PARAKEET_MODEL.to_string()
+                } else if provider_type == "qwen" {
+                    DEFAULT_QWEN_MODEL.to_string()
                 } else {
                     DEFAULT_WHISPER_MODEL.to_string()
                 })
@@ -869,6 +939,8 @@ async fn get_configured_model<R: Runtime>(app: &AppHandle<R>, provider_type: &st
         }
         None => Ok(if provider_type == "parakeet" {
             DEFAULT_PARAKEET_MODEL.to_string()
+        } else if provider_type == "qwen" {
+            DEFAULT_QWEN_MODEL.to_string()
         } else {
             DEFAULT_WHISPER_MODEL.to_string()
         }),

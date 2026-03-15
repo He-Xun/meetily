@@ -1,9 +1,9 @@
 //! Qwen3-ASR model wrapper and inference logic.
 
-use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
-use log::{info, debug, warn};
+use log::{debug, info, warn};
 use qwen3_asr::{AsrInference, TranscribeOptions};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Model status for tracking availability and download state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,10 +14,13 @@ pub enum ModelStatus {
     Missing,
     /// Model is being downloaded (progress percentage 0-100)
     Downloading { progress: u8 },
-    /// Model download or loading failed
-    Error { message: String },
-    /// Model file is corrupted and needs to be re-downloaded
-    Corrupted { message: String },
+    /// Model download or loading failed (matches Whisper/Parakeet format)
+    Error(String),
+    /// Model file is corrupted and needs to be re-downloaded (matches Whisper/Parakeet format)
+    Corrupted {
+        file_size: u64,
+        expected_min_size: u64,
+    },
 }
 
 /// Information about a Qwen model
@@ -99,27 +102,36 @@ impl QwenModel {
 
     /// Load the model into memory
     pub fn load(&mut self) -> Result<()> {
-        info!("🌐 Loading Qwen3-ASR model: {} from {}", self.name, self.model_path.display());
+        info!(
+            "🌐 Loading Qwen3-ASR model: {} from {}",
+            self.name,
+            self.model_path.display()
+        );
 
         // Check if model directory exists
         if !self.model_path.exists() {
-            return Err(QwenError::ModelNotFound(self.model_path.display().to_string()));
+            return Err(QwenError::ModelNotFound(
+                self.model_path.display().to_string(),
+            ));
         }
 
         // Check for required model files
         let config_file = self.model_path.join("config.json");
-        let tokenizer_file = self.model_path.join("tokenizer.json");
+        let safetensors_1 = self.model_path.join("model-00001-of-00002.safetensors");
+        let safetensors_2 = self.model_path.join("model-00002-of-00002.safetensors");
 
         if !config_file.exists() {
-            return Err(QwenError::ModelCorrupted(
-                format!("Missing config.json in {}", self.model_path.display())
-            ));
+            return Err(QwenError::ModelCorrupted(format!(
+                "Missing config.json in {}",
+                self.model_path.display()
+            )));
         }
 
-        if !tokenizer_file.exists() {
-            return Err(QwenError::ModelCorrupted(
-                format!("Missing tokenizer.json in {}", self.model_path.display())
-            ));
+        if !safetensors_1.exists() || !safetensors_2.exists() {
+            return Err(QwenError::ModelCorrupted(format!(
+                "Missing model safetensors files in {}",
+                self.model_path.display()
+            )));
         }
 
         // Try to load the model using qwen3-asr crate
@@ -155,17 +167,24 @@ impl QwenModel {
             return Err(QwenError::ModelNotLoaded);
         }
 
-        if audio.len() < 1600 { // Minimum 100ms at 16kHz
+        if audio.len() < 1600 {
+            // Minimum 100ms at 16kHz
             return Err(QwenError::AudioTooShort {
                 samples: audio.len(),
                 minimum: 1600,
             });
         }
 
-        let inference = self.inference.as_ref()
+        let inference = self
+            .inference
+            .as_ref()
             .ok_or_else(|| QwenError::ModelNotLoaded)?;
 
-        debug!("🎙️ Transcribing {} samples with language hint: {:?}", audio.len(), language);
+        debug!(
+            "🎙️ Transcribing {} samples with language hint: {:?}",
+            audio.len(),
+            language
+        );
 
         // Build transcription options
         let mut options = TranscribeOptions::default();
@@ -176,9 +195,15 @@ impl QwenModel {
         // Perform transcription
         match inference.transcribe_samples(audio, options) {
             Ok(result) => {
-                debug!("✅ Transcription successful: '{}' (language: {:?})", result.text, result.language);
+                // Clean up Qwen3-ASR output format artifacts
+                // Some versions output "onghua<asr_text>" or similar prefixes before actual text
+                let cleaned_text = crate::utils::text::clean_qwen_asr_output(&result.text);
+                debug!(
+                    "✅ Transcription successful: '{}' (language: {:?})",
+                    cleaned_text, result.language
+                );
                 Ok(TranscriptResult {
-                    text: result.text,
+                    text: cleaned_text,
                     language: Some(result.language),
                     confidence: None, // Qwen3-ASR doesn't provide confidence scores
                 })
@@ -222,10 +247,7 @@ mod tests {
 
     #[test]
     fn test_audio_too_short() {
-        let model = QwenModel::new(
-            "test-model".to_string(),
-            PathBuf::from("/fake/path"),
-        );
+        let model = QwenModel::new("test-model".to_string(), PathBuf::from("/fake/path"));
 
         // Model not loaded, but audio too short check happens first
         let audio = vec![0.0f32; 100]; // Too short

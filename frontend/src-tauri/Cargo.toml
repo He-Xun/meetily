@@ -107,8 +107,10 @@ ort = { version = "2.0.0-rc.10" }  # ONNX Runtime for Parakeet models
 thiserror = "2.0.16"                # Error handling for Parakeet
 
 # Qwen3-ASR multilingual speech recognition
-# qwen3-asr will be added separately with platform-specific GPU features
-qwen3-asr = "0.2"
+# qwen3-asr multilingual speech recognition with platform-specific GPU acceleration
+qwen3-asr = { version = "0.2", features = ["metal"] }  # macOS: Metal GPU (default)
+# qwen3-asr = { version = "0.2", features = ["cuda"] }  # Windows/Linux NVIDIA: Uncomment for CUDA
+# qwen3-asr = "0.2"  # CPU-only fallback (no GPU acceleration)
 
 # Async
 tokio = { version = "1.32.0", features = ["full", "tracing"] }

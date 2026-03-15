@@ -151,20 +151,15 @@ pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) 
                 Ok(models) => {
                     // Find an available model
                     let available_model = models.iter().find(|m| {
-                        if let Some(status) = m.get("status") {
-                            if let Some(status_str) = status.as_str() {
-                                return status_str == "\"Available\"" || status_str == "Available";
-                            }
-                        }
-                        false
+                        matches!(m.status, crate::qwen_engine::model::ModelStatus::Available)
                     });
 
                     if let Some(model) = available_model {
-                        let model_name = model.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+                        let model_name = &model.name;
                         info!("✅ Qwen model validation successful: {} is ready", model_name);
 
                         // Auto-load the first available model
-                        if let Err(e) = crate::qwen_engine::commands::qwen_load_model(model_name.to_string()).await {
+                        if let Err(e) = crate::qwen_engine::commands::qwen_load_model(model_name.clone()).await {
                             warn!("⚠️ Failed to auto-load Qwen model: {}", e);
                             return Err(format!("Failed to load Qwen model '{}': {}", model_name, e));
                         }
